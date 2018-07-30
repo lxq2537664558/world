@@ -95,7 +95,7 @@ const char * IRC::GetSafeChannelName(const char *channel_name) {
 	return safe_channel_name;
 }
 
-void IRC::ConnectToServer(const shared_ptr<Client>& client, const char *host, short port, const char *nick) {
+void IRC::ConnectToServer(Client* client, const char *host, short port, const char *nick) {
 	int32 character_id;
 	IRCServer *server;
 	int ret;
@@ -248,7 +248,7 @@ void IRC::ConnectToGlobalServer(const char *host, short port, const char *nick) 
 	}
 }
 
-void IRC::DisconnectFromServer(const shared_ptr<Client>& client) {
+void IRC::DisconnectFromServer(Client* client) {
 	IRCServer *server;
 	int32 character_id;
 
@@ -279,7 +279,7 @@ void IRC::DisconnectFromGlobalServer() {
 	}
 }
 
-void IRC::JoinChannel(const shared_ptr<Client>& client, const char *channel_name) {
+void IRC::JoinChannel(Client* client, const char *channel_name) {
 	const char *safe_channel_name;
 	int32 character_id;
 	int ret;
@@ -323,7 +323,7 @@ void IRC::JoinChannel(const shared_ptr<Client>& client, const char *channel_name
 	safe_delete_array(safe_channel_name);
 }
 
-void IRC::LeaveChannel(const shared_ptr<Client>& client, const char *channel_name) {
+void IRC::LeaveChannel(Client* client, const char *channel_name) {
 	const char *safe_channel_name;
 	int32 character_id;
 	int ret;
@@ -359,7 +359,7 @@ void IRC::LeaveChannel(const shared_ptr<Client>& client, const char *channel_nam
 	safe_delete_array(safe_channel_name);
 }
 
-void IRC::ListChannels(const shared_ptr<Client>& client) {
+void IRC::ListChannels(Client* client) {
 	vector<IRCChannel *> *channels;
 	vector<IRCChannel *>::iterator itr;
 	IRCServer *server;
@@ -388,7 +388,7 @@ void IRC::ListChannels(const shared_ptr<Client>& client) {
 	m_servers.releasereadlock(__FUNCTION__, __LINE__);
 }
 
-void IRC::Say(const shared_ptr<Client>& client, const char *channel_name, const char *message) {
+void IRC::Say(Client* client, const char *channel_name, const char *message) {
 	const char *safe_channel_name;
 	int32 character_id;
 	int ret;
@@ -442,7 +442,7 @@ void IRC::Say(const shared_ptr<Client>& client, const char *channel_name, const 
 	safe_delete_array(safe_channel_name);
 }
 
-void IRC::Say(const shared_ptr<Client>& client, int32 channel_index, const char *message) {
+void IRC::Say(Client* client, int32 channel_index, const char *message) {
 	IRCChannel *channel;
 	int32 character_id;
 	int ret;
@@ -527,7 +527,7 @@ ThreadReturnType ServerLoop(void *arg) {
 	THREAD_RETURN(NULL);
 }
 
-IRCServer* IRC::GetServer(const shared_ptr<Client>& client) {
+IRCServer* IRC::GetServer(Client* client) {
 	IRCServer* ret = 0;
 
 	m_servers.readlock(__FUNCTION__, __LINE__);

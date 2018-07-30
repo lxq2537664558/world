@@ -408,7 +408,7 @@ void ZoneServer::LoadSpellProcess(){
 
 void ZoneServer::LockAllSpells(Player* player) {
 	if (player && spellProcess) {
-		shared_ptr<Client> client = GetClientBySpawn(player);
+		Client* client = GetClientBySpawn(player);
 		if (client)
 			spellProcess->LockAllSpells(client);
 	}
@@ -416,7 +416,7 @@ void ZoneServer::LockAllSpells(Player* player) {
 	
 void ZoneServer::UnlockAllSpells(Player* player) {
 	if (player && spellProcess) {
-		shared_ptr<Client> client = GetClientBySpawn(player);
+		Client* client = GetClientBySpawn(player);
 		if (client)
 			spellProcess->UnlockAllSpells(client);
 	}
@@ -461,7 +461,7 @@ void ZoneServer::DeleteData(bool boot_clients){
 			if(!boot_clients && spawn->IsPlayer())
 				tmp_player_list.push_back(spawn);
 			else if(spawn->IsPlayer()){
-				shared_ptr<Client> client = GetClientBySpawn(spawn);
+				Client* client = GetClientBySpawn(spawn);
 				if(client)
 					client->Disconnect();
 			}
@@ -498,8 +498,8 @@ void ZoneServer::DeleteData(bool boot_clients){
 	} else {
 		shared_lock<shared_timed_mutex> guard(clients_mutex);
 
-		for (const auto client : clients) {
-			AddToSpawnRangeMap(client);
+		for (const auto& client : clients) {
+			AddToSpawnRangeMap(client.get());
 		}
 	}
 
@@ -590,7 +590,7 @@ RevivePoint* ZoneServer::GetRevivePoint(int32 id){
 	return 0;
 }
 
-vector<RevivePoint*>* ZoneServer::GetRevivePoints(const shared_ptr<Client>& client)
+vector<RevivePoint*>* ZoneServer::GetRevivePoints(Client* client)
 {
 	vector<RevivePoint*>* points = new vector<RevivePoint*>;
 	RevivePoint* closest_point = 0;
@@ -667,7 +667,7 @@ void ZoneServer::RegenUpdate(){
 			}
 
 			if (spawn->IsPlayer()) {
-				shared_ptr<Client> client = GetClientBySpawn(spawn);
+				Client* client = GetClientBySpawn(spawn);
 
 				if (client && client->IsConnected()) {
 					client->QueuePacket(client->GetPlayer()->GetPlayerInfo()->serialize(client->GetVersion()));
@@ -722,7 +722,7 @@ void ZoneServer::ProcessDepop(bool respawns_allowed, bool repop) {
 				const auto spawn = kv.second;
 
 				if (spawn && !spawn->IsPlayer()) {
-					SendRemoveSpawn(client, spawn, packet);
+					SendRemoveSpawn(client.get(), spawn, packet);
 				}
 			}
 			MSpawnList.releasereadlock(__FUNCTION__, __LINE__);
@@ -804,7 +804,7 @@ bool ZoneServer::AddCloseSpawnsToSpawnGroup(Spawn* spawn, float radius){
 	return ret;
 }
 
-void ZoneServer::RepopSpawns(const shared_ptr<Client>& client, Spawn* in_spawn){
+void ZoneServer::RepopSpawns(Client* client, Spawn* in_spawn){
 	vector<Spawn*>* spawns = in_spawn->GetSpawnGroup();
 	PacketStruct* packet = configReader.getStruct("WS_DestroyGhostCmd", client->GetVersion());;
 	if(spawns){
@@ -824,7 +824,7 @@ void ZoneServer::RepopSpawns(const shared_ptr<Client>& client, Spawn* in_spawn){
 	safe_delete(packet);
 }
 
-bool ZoneServer::CheckNPCAttacks(NPC* npc, Spawn* victim, shared_ptr<Client> client){
+bool ZoneServer::CheckNPCAttacks(NPC* npc, Spawn* victim, Client* client) {
 	if(!npc || !victim)
 		return true;
 
@@ -1050,7 +1050,7 @@ void ZoneServer::AddEnemyList(NPC* npc){
 	m_npc_faction_list.releasewritelock(__FUNCTION__, __LINE__);
 }
 
-void ZoneServer::AddToSpawnRangeMap(shared_ptr<Client> client) {
+void ZoneServer::AddToSpawnRangeMap(Client* client) {
 	lock_guard<mutex> spawn_guard(spawn_range_mutex);
 	lock_guard<mutex> client_guard(client_range_mutex);
 
@@ -1058,7 +1058,7 @@ void ZoneServer::AddToSpawnRangeMap(shared_ptr<Client> client) {
 	client_range_mutex_map[client];
 }
 
-void ZoneServer::RemoveFromSpawnRangeMap(shared_ptr<Client> client) {
+void ZoneServer::RemoveFromSpawnRangeMap(Client* client) {
 	lock_guard<mutex> spawn_guard(spawn_range_mutex);
 	lock_guard<mutex> client_guard(client_range_mutex);
 
@@ -1066,7 +1066,7 @@ void ZoneServer::RemoveFromSpawnRangeMap(shared_ptr<Client> client) {
 	client_range_mutex_map.erase(client);
 }
 
-map<int32, float>* ZoneServer::GetClientRangeMap(shared_ptr<Client> client) {
+map<int32, float>* ZoneServer::GetClientRangeMap(Client* client) {
 	lock_guard<mutex> guard(spawn_range_mutex);
 
 	auto client_range = spawn_range_map.find(client);
@@ -1078,7 +1078,7 @@ map<int32, float>* ZoneServer::GetClientRangeMap(shared_ptr<Client> client) {
 	return nullptr;
 }
 
-void ZoneServer::RemoveFromClientRangeMap(shared_ptr<Client> client, int32 spawn_id) {
+void ZoneServer::RemoveFromClientRangeMap(Client* client, int32 spawn_id) {
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	lock_guard<mutex> guard(client_range_mutex_map[client]);
@@ -1088,7 +1088,7 @@ void ZoneServer::RemoveFromClientRangeMap(shared_ptr<Client> client, int32 spawn
 	}
 }
 
-float ZoneServer::GetClientRangeDistance(shared_ptr<Client> client, int32 spawn_id) {
+float ZoneServer::GetClientRangeDistance(Client* client, int32 spawn_id) {
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	lock_guard<mutex> guard(client_range_mutex_map[client]);
@@ -1106,7 +1106,7 @@ float ZoneServer::GetClientRangeDistance(shared_ptr<Client> client, int32 spawn_
 	return 0.0f;
 }
 
-bool ZoneServer::HasClientRangeSpawn(shared_ptr<Client> client, int32 spawn_id) {
+bool ZoneServer::HasClientRangeSpawn(Client* client, int32 spawn_id) {
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	lock_guard<mutex> guard(client_range_mutex_map[client]);
@@ -1114,7 +1114,7 @@ bool ZoneServer::HasClientRangeSpawn(shared_ptr<Client> client, int32 spawn_id) 
 	return client_range && client_range->count(spawn_id) > 0;
 }
 
-void ZoneServer::SetClientRangeDistance(shared_ptr<Client> client, int32 spawn_id, float distance) {
+void ZoneServer::SetClientRangeDistance(Client* client, int32 spawn_id, float distance) {
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	lock_guard<mutex> guard(client_range_mutex_map[client]);
@@ -1124,7 +1124,7 @@ void ZoneServer::SetClientRangeDistance(shared_ptr<Client> client, int32 spawn_i
 	}
 }
 
-void ZoneServer::CheckSpawnRange(shared_ptr<Client> client, Spawn* spawn, bool initial_login) {
+void ZoneServer::CheckSpawnRange(Client* client, Spawn* spawn, bool initial_login) {
 	if (client && spawn && (initial_login || client->IsConnected())) {
 		if (spawn != client->GetPlayer()) {
 			float distance = spawn->GetDistance(client->GetPlayer());
@@ -1147,7 +1147,7 @@ void ZoneServer::CheckSpawnRange(Spawn* spawn){
 
 	for (const auto& client : clients) {
 		if (client && client->IsReadyForSpawns()) {
-			CheckSpawnRange(client, spawn);
+			CheckSpawnRange(client.get(), spawn);
 		}
 	}
 }
@@ -1158,7 +1158,7 @@ void ZoneServer::PrepareSpawnID(Player* player, Spawn* spawn){
 	player->player_spawn_reverse_id_map[spawn] = player->spawn_id;
 }
 
-void ZoneServer::CheckSendSpawnToClient(const shared_ptr<Client>& client, bool initial_login) {
+void ZoneServer::CheckSendSpawnToClient(Client* client, bool initial_login) {
 	if (!client) {
 		LogWrite(ZONE__ERROR, 0, "Zone", "CheckSendSpawnToClient called with an invalid client");
 		return;
@@ -1235,7 +1235,7 @@ void ZoneServer::CheckSendSpawnToClient(){
 
 	for (const auto& client : clients) {
 		if (client->IsReadyForSpawns()) {
-			CheckSendSpawnToClient(client);
+			CheckSendSpawnToClient(client.get());
 		}
 	}
 }
@@ -1255,7 +1255,7 @@ void ZoneServer::CheckRemoveSpawnFromClient(Spawn* spawn) {
 
 		if (spawn && spawn != client->GetPlayer() && !spawn->IsWidget() && client->GetPlayer()->WasSentSpawn(spawn->GetID()) && !client->GetPlayer()->WasSpawnRemoved(spawn)) {
 			// TODO: Check exists? This can return 0.0
-			float distance = GetClientRangeDistance(client, spawn->GetID());
+			float distance = GetClientRangeDistance(client.get(), spawn->GetID());
 			bool should_hide = false;
 
 			if (spawn->IsPlayer() && static_cast<Player*>(spawn)->IsStealthed()) {
@@ -1265,7 +1265,7 @@ void ZoneServer::CheckRemoveSpawnFromClient(Spawn* spawn) {
 			}
 
 			if (should_hide || distance > REMOVE_SPAWN_DISTANCE) {
-				SendRemoveSpawn(client, spawn, packet);
+				SendRemoveSpawn(client.get(), spawn, packet);
 			}
 		}
 	}
@@ -1510,10 +1510,12 @@ bool ZoneServer::Process()
 		if (write_statistics) {
 			shared_lock<shared_timed_mutex> guard(clients_mutex);
 
-			for (const auto client : clients) {
-				thread t([client]() {
-					if (client->GetPlayer()) {
-						client->GetPlayer()->WritePlayerStatistics();
+			for (const auto& client : clients) {
+				Client* client_ptr = client.get();
+
+				thread t([client_ptr]() {
+					if (client_ptr->GetPlayer()) {
+						client_ptr->GetPlayer()->WritePlayerStatistics();
 					}
 				});
 
@@ -1668,22 +1670,28 @@ bool ZoneServer::SpawnProcess() {
 
 bool ZoneServer::UpdateProcess() {
 	if (!zoneShuttingDown) {
+	    vector<shared_ptr<SpawnUpdate>> updates_to_process;
+
 		{
 			lock_guard<mutex> guard(changed_spawns_mutex);
 
 			for (const auto& kv : changed_spawns) {
-				shared_ptr<SpawnUpdate> spawn_update = kv.second;
+				updates_to_process.push_back(kv.second);
+			}
 
-				shared_lock<shared_timed_mutex> guard(clients_mutex);
+			changed_spawns.clear();
+		}
 
-				for (const auto& client : clients) {
-					if (!spawn_update->client || client == spawn_update->client) {
+		{
+			shared_lock<shared_timed_mutex> guard(clients_mutex);
+
+			for (const auto spawn_update : updates_to_process) {
+				for (const auto &client : clients) {
+					if (!spawn_update->client || client.get() == spawn_update->client) {
 						client->AddChangedSpawn(spawn_update);
 					}
 				}
 			}
-
-			changed_spawns.clear();
 		}
 
 		if (player_pos_update.Check()) {
@@ -1813,7 +1821,7 @@ void ZoneServer::AddSpawnExpireTimer(Spawn* spawn, int32 expire_time, int32 expi
 	}
 }
 
-void ZoneServer::SaveClient(const shared_ptr<Client>& client){
+void ZoneServer::SaveClient(Client* client){
 	client->Save();
 }
 
@@ -1822,10 +1830,12 @@ void ZoneServer::SaveClients(){
 
 	shared_lock<shared_timed_mutex> guard(clients_mutex);
 
-	for (const auto client : clients) {
+	for (const auto& client : clients) {
 		if (client->IsConnected()) {
-			workers.push_back(thread([this, client]() {
-				SaveClient(client);
+			Client* client_ptr = client.get();
+
+			workers.push_back(thread([this, client_ptr]() {
+				SaveClient(client_ptr);
 			}));
 		}
 	}
@@ -1843,7 +1853,7 @@ void ZoneServer::SendSpawnVisualState(Spawn* spawn, int16 type){
 	spawn->SetTempVisualState(type);
 }
 
-void ZoneServer::ResendSpawns(const shared_ptr<Client>& client) {
+void ZoneServer::ResendSpawns(Client* client) {
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	if (client_range) {
@@ -1863,7 +1873,7 @@ void ZoneServer::SendSpawnChanges(bool only_pos_changes, bool only_players) {
 	}
 }
 
-void ZoneServer::AddSpawnUpdate(int32 spawn_id, bool info_changed, bool pos_changed, bool vis_changed, shared_ptr<Client> client) {
+void ZoneServer::AddSpawnUpdate(int32 spawn_id, bool info_changed, bool pos_changed, bool vis_changed, Client* client) {
 	lock_guard<mutex> guard(changed_spawns_mutex);
 
 	auto current_update = changed_spawns.find(spawn_id);
@@ -1922,33 +1932,33 @@ Spawn* ZoneServer::FindSpawn(Player* searcher, const char* name){
 }
 
 void ZoneServer::AddDrowningVictim(Player* player){
-	shared_ptr<Client> client = GetClientBySpawn(player);
+	Client* client = GetClientBySpawn(player);
 	if(client && drowning_victims.count(client) == 0)
 		drowning_victims.Put(client, Timer::GetCurrentTime2());
 }
 
 void ZoneServer::RemoveDrowningVictim(Player* player){
-	shared_ptr<Client> client = GetClientBySpawn(player);
+	Client* client = GetClientBySpawn(player);
 	if(client)
 		drowning_victims.erase(client);
 }
 
-shared_ptr<Client> ZoneServer::GetDrowningVictim(Player* player){
-	shared_ptr<Client> client = GetClientBySpawn(player);
+Client* ZoneServer::GetDrowningVictim(Player* player){
+	Client* client = GetClientBySpawn(player);
 	if(client && drowning_victims.count(client) > 0)
 		return(client);
 	return 0;
 }
 
 void ZoneServer::ProcessDrowning(){
-	vector<shared_ptr<Client>> dead_list;
+	vector<Client*> dead_list;
 	if(drowning_victims.size(true) > 0){
 		sint32 damage = 0;
 		int32 current_time = Timer::GetCurrentTime2();
-		MutexMap<shared_ptr<Client>, int32>::iterator itr = drowning_victims.begin();
+		MutexMap<Client*, int32>::iterator itr = drowning_victims.begin();
 		while(itr.Next()){
 			if(current_time >= itr->second) {
-				shared_ptr<Client> client = itr->first;
+				Client* client = itr->first;
 				Player* player = client->GetPlayer();
 				drowning_victims.Get(client) = Timer::GetCurrentTime2() + 2000;
 				damage = player->GetTotalHP()/20 + player->GetHPRegen();
@@ -1963,7 +1973,7 @@ void ZoneServer::ProcessDrowning(){
 		}
 	}
 	if(dead_list.size() > 0){
-		vector<shared_ptr<Client>>::iterator itr;
+		vector<Client*>::iterator itr;
 		for(itr = dead_list.begin(); itr != dead_list.end(); itr++){
 			RemoveDrowningVictim((*itr)->GetPlayer());
 			KillSpawn((*itr)->GetPlayer(), 0);
@@ -1976,11 +1986,11 @@ void ZoneServer::SendCharSheetChanges(){
 	shared_lock<shared_timed_mutex> guard(clients_mutex);
 
 	for (const auto& client : clients) {
-		SendCharSheetChanges(client);
+		SendCharSheetChanges(client.get());
 	}
 }
 
-void ZoneServer::SendCharSheetChanges(const shared_ptr<Client>& client) {
+void ZoneServer::SendCharSheetChanges(Client* client) {
 	if (client && client->IsConnected() && client->GetPlayer()->GetCharSheetChanged()) {
 		client->GetPlayer()->SetCharSheetChanged(false);
 		ClientPacketFunctions::SendCharacterSheet(client);
@@ -2700,7 +2710,7 @@ void ZoneServer::ReloadTransporters(){
 	}
 }
 
-void ZoneServer::CheckTransporters(const shared_ptr<Client>& client) {
+void ZoneServer::CheckTransporters(Client* client) {
 	MTransportLocations.readlock(__FUNCTION__, __LINE__);
 	if (transporter_locations.size() > 0) {
 		for (const auto loc : transporter_locations) {
@@ -2843,23 +2853,27 @@ void ZoneServer::AddSpawn(Spawn* spawn) {
 	}
 }
 
-void ZoneServer::AddClient(shared_ptr<Client> client) {
+void ZoneServer::AddClient(unique_ptr<Client> client) {
 	unique_lock<shared_timed_mutex> guard(clients_mutex);
 
-	clients.push_back(client);
+	clients.push_back(move(client));
 }
 
-void ZoneServer::AddIncomingClient(shared_ptr<Client> client) {
+void ZoneServer::AddIncomingClient(unique_ptr<Client> client) {
 	lock_guard<mutex> guard(incoming_clients_mutex);
 
-	incoming_clients.push_back(client);
+	incoming_clients.push_back(move(client));
 }
 
-void ZoneServer::RemoveClient(shared_ptr<Client> client) {
+void ZoneServer::RemoveClient(unique_ptr<Client> client) {
 	Guild *guild;
 
 	if (client) {
 		client->Disconnect();
+
+		if (lua_interface) {
+			lua_interface->RemoveDebugClients(client.get());
+		}
 		
 		LogWrite(ZONE__DEBUG, 0, "Zone", "Sending login equipment appearance updates...");
 		loginserver.SendImmediateEquipmentUpdatesForChar(client->GetPlayer()->GetCharacterID());
@@ -2868,7 +2882,7 @@ void ZoneServer::RemoveClient(shared_ptr<Client> client) {
 			if ((guild = client->GetPlayer()->GetGuild()) != NULL)
 				guild->GuildMemberLogoff(client->GetPlayer());
 
-			chat.LeaveAllChannels(client);
+			chat.LeaveAllChannels(client.get());
 		}
 		
 		int32 LD_Timer = rule_manager.GetGlobalRule(R_World, LinkDeadTimer)->GetInt32();
@@ -2888,7 +2902,7 @@ void ZoneServer::RemoveClient(shared_ptr<Client> client) {
 				}
 			}
 
-			database.SavePlayerActiveSpells(client);
+			database.SavePlayerActiveSpells(client.get());
 			GetSpellProcess()->RemoveSpellTimersFromSpawn(client->GetPlayer(), true);
 				
 			client->GetPlayer()->DismissPet((NPC*)client->GetPlayer()->GetPet());
@@ -2898,8 +2912,8 @@ void ZoneServer::RemoveClient(shared_ptr<Client> client) {
 		}
 
 		RemoveSpawn(client->GetPlayer(), false);
-		RemoveFromSpawnRangeMap(client);
-		RemovePlayerProximity(client);
+		RemoveFromSpawnRangeMap(client.get());
+		RemovePlayerProximity(client.get());
 
 		map<int32, int32>::iterator itr;
 		for (itr = client->GetPlayer()->SpawnedBots.begin(); itr != client->GetPlayer()->SpawnedBots.end(); itr++) {
@@ -2910,22 +2924,17 @@ void ZoneServer::RemoveClient(shared_ptr<Client> client) {
 
 		client_spawn_map.Put(client->GetPlayer(), nullptr);
 
-		{
-			unique_lock<shared_timed_mutex> guard(clients_mutex);
-			clients.erase(remove(clients.begin(), clients.end(), client), clients.end());
-		}
-
 		zone_list.RemoveClientFromMap(client->GetPlayer()->GetName());
-		zone_list.AddClientTimeout(client, 10);
+
+		database.ToggleCharacterOnline(client.get(), 0);
 
 		LogWrite(ZONE__INFO, 0, "Zone", "Scheduling client '%s' for removal.", client->GetPlayer()->GetName());
 
-		LogWrite(MISC__TODO, 1, "TODO", "Put Player Online Status updates in a timer eventually\n\t(%s, function: %s, line #: %i)", __FILE__, __FUNCTION__, __LINE__);
-		database.ToggleCharacterOnline(client, 0);
+		zone_list.AddClientTimeout(move(client), 10);
 	}
 }
 
-void ZoneServer::RemoveClientImmediately(shared_ptr<Client> client) {
+void ZoneServer::RemoveClientImmediately(Client* client) {
 	/*Guild *guild;
 
 	if (client) {
@@ -2953,8 +2962,8 @@ void ZoneServer::ClientProcess() {
 	{
 		lock_guard<mutex> guard(incoming_clients_mutex);
 
-		for (const auto client : incoming_clients) {
-			AddClient(client);
+		for (auto iter = incoming_clients.begin(); iter != incoming_clients.end(); ++iter) {
+			AddClient(move(*iter));
 		}
 
 		incoming_clients.clear();
@@ -2964,21 +2973,23 @@ void ZoneServer::ClientProcess() {
 		shared_lock<shared_timed_mutex> guard(clients_mutex);
 
 		if (!clients.size()) {
-			if (!IsCityZone() && !AlwaysLoaded() && !shutdownTimer.Enabled()) {
+			/*if (!IsCityZone() && !AlwaysLoaded() && !shutdownTimer.Enabled()) {
 				LogWrite(ZONE__INFO, 0, "Zone", "Starting zone shutdown timers...");
 				shutdownTimer.Start();
-			}
+			}*/
 
 			return;
 		}
 	}
 
-	shutdownTimer.Disable();	
+	//shutdownTimer.Disable();
 
 	{
 		shared_lock<shared_timed_mutex> guard(clients_mutex);
 
-		for (const auto client : clients) {
+		for (auto iter = clients.begin(); iter != clients.end();) {
+			Client* client = (*iter).get();
+
 #ifndef NO_CATCH
 			try {
 #endif
@@ -2996,9 +3007,19 @@ void ZoneServer::ClientProcess() {
 						}
 					}
 
+					unique_ptr<Client> client;
+
 					guard.unlock();
-					RemoveClient(client);
+					{
+						unique_lock<shared_timed_mutex> write_guard(clients_mutex);
+						client = move(*iter);
+						iter = clients.erase(iter);
+					}
+
+                    RemoveClient(move(client));
 					guard.lock();
+				} else {
+					++iter;
 				}
 #ifndef NO_CATCH
 			} catch(...) {
@@ -3016,7 +3037,12 @@ void ZoneServer::ClientProcess() {
 					}
 
 					guard.unlock();
-					RemoveClient(client);
+					{
+						unique_lock<shared_timed_mutex> write_guard(clients_mutex);
+						unique_ptr<Client> client = move(*iter);
+						iter = clients.erase(iter);
+						RemoveClient(move(client));
+					}
 					guard.lock();
 				} catch(...) {
 					LogWrite(ZONE__ERROR, 0, "Zone", "Exception caught when in ZoneServer::ClientProcess(), second try\n%s, %i", __FUNCTION__, __LINE__);
@@ -3037,7 +3063,7 @@ void ZoneServer::SimpleMessage(int8 type, const char* message, Spawn* from, floa
 	}
 }
 
-void ZoneServer::HandleChatMessage(const shared_ptr<Client>& client, Spawn* from, const char* to, int16 channel, const char* message, float distance, const char* channel_name, bool show_bubble, int32 language){
+void ZoneServer::HandleChatMessage(Client* client, Spawn* from, const char* to, int16 channel, const char* message, float distance, const char* channel_name, bool show_bubble, int32 language){
 	if((!distance || from->GetDistance(client->GetPlayer()) <= distance) && (!from || !client->GetPlayer()->IsIgnored(from->GetName()))){
 		PacketStruct* packet = configReader.getStruct("WS_HearChat", client->GetVersion());
 		if(packet){
@@ -3073,7 +3099,7 @@ void ZoneServer::HandleChatMessage(Spawn* from, const char* to, int16 channel, c
 
 	for (const auto& client : clients) {
 		if (client->IsConnected()) {
-			HandleChatMessage(client, from, to, channel, message, distance, channel_name, show_bubble, language);
+			HandleChatMessage(client.get(), from, to, channel, message, distance, channel_name, show_bubble, language);
 		}
 	}
 }
@@ -3105,7 +3131,7 @@ void ZoneServer::HandleAnnouncement(const char* message) {
 	}
 }
 
-void ZoneServer::SendTimeUpdate(const shared_ptr<Client>& client){
+void ZoneServer::SendTimeUpdate(Client* client){
 	if(client){
 		PacketStruct* packet = world.GetWorldTime(client->GetVersion());
 		if(packet){
@@ -3120,7 +3146,7 @@ void ZoneServer::SendTimeUpdateToAllClients(){
 
 	for (const auto& client : clients) {
 		if (client->IsConnected()) {
-			SendTimeUpdate(client);
+			SendTimeUpdate(client.get());
 		}
 	}
 }
@@ -3141,7 +3167,7 @@ void ZoneServer::UpdateVitality(float amount) {
 	}
 }
 
-void ZoneServer::SendSpawn(Spawn* spawn, const shared_ptr<Client>& client) {
+void ZoneServer::SendSpawn(Spawn* spawn, Client* client) {
 	EQ2Packet* outapp = spawn->serialize(client->GetPlayer(), client->GetVersion());
 
 	if (outapp) {
@@ -3149,17 +3175,17 @@ void ZoneServer::SendSpawn(Spawn* spawn, const shared_ptr<Client>& client) {
 	}
 }
 
-shared_ptr<Client> ZoneServer::GetClientBySpawn(Spawn* spawn) {
+Client* ZoneServer::GetClientBySpawn(Spawn* spawn) {
 	return client_spawn_map.Get(spawn);
 }
 
-shared_ptr<Client> ZoneServer::GetClientByName(char* name) {
+Client* ZoneServer::GetClientByName(char* name) {
 	shared_lock<shared_timed_mutex> guard(clients_mutex);
 
 	for (const auto& client : clients) {
 		if (client->GetPlayer()) {
 			if (strncmp(client->GetPlayer()->GetName(), name, strlen(name)) == 0) {
-				return client;
+				return client.get();
 			}
 		}
 	}
@@ -3196,7 +3222,7 @@ void ZoneServer::ProcessMovement(){
 	remove_movement_spawns.clear();
 }
 
-void ZoneServer::PlayFlavor(const shared_ptr<Client>& client, Spawn* spawn, const char* mp3, const char* text, const char* emote, int32 key1, int32 key2, int8 language){
+void ZoneServer::PlayFlavor(Client* client, Spawn* spawn, const char* mp3, const char* text, const char* emote, int32 key1, int32 key2, int8 language){
 	if(!client || !spawn)
 		return;
 
@@ -3230,7 +3256,7 @@ void ZoneServer::PlayFlavor(const shared_ptr<Client>& client, Spawn* spawn, cons
 	}
 }
 
-void ZoneServer::PlayVoice(const shared_ptr<Client>& client, Spawn* spawn, const char* mp3, int32 key1, int32 key2){
+void ZoneServer::PlayVoice(Client* client, Spawn* spawn, const char* mp3, int32 key1, int32 key2){
 	if(!client || !spawn)
 		return;
 
@@ -3257,7 +3283,7 @@ void ZoneServer::PlayFlavor(Spawn* spawn, const char* mp3, const char* text, con
 			continue;
 		}
 
-		PlayFlavor(client, spawn, mp3, text, emote, key1, key2, language);
+		PlayFlavor(client.get(), spawn, mp3, text, emote, key1, key2, language);
 	}
 }
 
@@ -3273,11 +3299,11 @@ void ZoneServer::PlayVoice(Spawn* spawn, const char* mp3, int32 key1, int32 key2
 			continue;
 		}
 
-		PlayVoice(client, spawn, mp3, key1, key2);
+		PlayVoice(client.get(), spawn, mp3, key1, key2);
 	}
 }
 
-void ZoneServer::PlaySoundFile(const shared_ptr<Client>& client, const char* name, float origin_x, float origin_y, float origin_z){
+void ZoneServer::PlaySoundFile(Client* client, const char* name, float origin_x, float origin_y, float origin_z){
 	if (!name) {
 		return;
 	}
@@ -3301,7 +3327,7 @@ void ZoneServer::PlaySoundFile(const shared_ptr<Client>& client, const char* nam
 	} else {
 		EQ2Packet* outapp = 0;
 		int16 packet_version = 0;
-		vector<shared_ptr<Client>>::iterator client_itr;
+		vector<unique_ptr<Client>>::iterator client_itr;
 
 		shared_lock<shared_timed_mutex> guard(clients_mutex);
 
@@ -3459,7 +3485,7 @@ Spawn* ZoneServer::GetSpawnByID(int32 id) {
 	return ret;
 }
 
-bool ZoneServer::SendRemoveSpawn(const shared_ptr<Client>& client, Spawn* spawn, PacketStruct* packet, bool delete_spawn)
+bool ZoneServer::SendRemoveSpawn(Client* client, Spawn* spawn, PacketStruct* packet, bool delete_spawn)
 {
 	if(!client || !spawn)
 		return false;
@@ -3490,16 +3516,16 @@ bool ZoneServer::SendRemoveSpawn(const shared_ptr<Client>& client, Spawn* spawn,
 	return false;
 }
 
-void ZoneServer::SetSpawnCommand(Spawn* spawn, int8 type, char* value, shared_ptr<Client> client){
+void ZoneServer::SetSpawnCommand(Spawn* spawn, int8 type, char* value, Client* client) {
 	//commands
 	LogWrite(MISC__TODO, 1, "TODO", "%s does nothing!\n%s, %i", __FUNCTION__, __FILE__, __LINE__);
 }
 
-void ZoneServer::SetSpawnCommand(int32 spawn_id, int8 type, char* value, shared_ptr<Client> client){
+void ZoneServer::SetSpawnCommand(int32 spawn_id, int8 type, char* value, Client* client) {
 	LogWrite(MISC__TODO, 1, "TODO", "%s does nothing!\n%s, %i", __FUNCTION__, __FILE__, __LINE__);
 }
 
-void ZoneServer::ApplySetSpawnCommand(const shared_ptr<Client>& client, Spawn* target, int8 type, char* value){
+void ZoneServer::ApplySetSpawnCommand(Client* client, Spawn* target, int8 type, char* value){
 	// This will apply the /spawn set command to all the spawns in the zone with the same DB ID, we do not want to set
 	// location values (x, y, z, heading, grid) for all spawns in the zone with the same DB ID, only the targeted spawn
 	if(type == SPAWN_SET_VALUE_SPAWNENTRY_SCRIPT || type == SPAWN_SET_VALUE_SPAWNLOCATION_SCRIPT || (type >= SPAWN_SET_VALUE_X && type <= SPAWN_SET_VALUE_LOCATION) ||
@@ -3716,8 +3742,8 @@ void ZoneServer::RemoveSpawn(Spawn* spawn, bool delete_spawn, bool respawn, bool
 				client->GetPlayer()->SetTarget(0);
 			}
 
-			SendRemoveSpawn(client, spawn, packet, delete_spawn);
-			RemoveFromClientRangeMap(client, spawn->GetID());
+			SendRemoveSpawn(client.get(), spawn, packet, delete_spawn);
+			RemoveFromClientRangeMap(client.get(), spawn->GetID());
 		}
 	}
 
@@ -3761,8 +3787,8 @@ void ZoneServer::RemoveSpawnFromClient(Spawn* spawn, bool skip_if_client) {
 			client->GetPlayer()->SetTarget(0);
 		}
 
-		SendRemoveSpawn(client, spawn, packet);
-		RemoveFromClientRangeMap(client, spawn->GetID());
+		SendRemoveSpawn(client.get(), spawn, packet);
+		RemoveFromClientRangeMap(client.get(), spawn->GetID());
 	}
 }
 
@@ -3817,7 +3843,7 @@ int32 ZoneServer::GetClosestLocation(Spawn* spawn){
 	return 0;
 }
 
-void ZoneServer::SendQuestUpdates(const shared_ptr<Client>& client, Spawn* spawn) {
+void ZoneServer::SendQuestUpdates(Client* client, Spawn* spawn) {
 	if (!client) {
 		return;
 	}
@@ -3844,7 +3870,7 @@ void ZoneServer::SendQuestUpdates(const shared_ptr<Client>& client, Spawn* spawn
 	}
 }
 
-void ZoneServer::SendAllSpawnsForLevelChange(const shared_ptr<Client>& client){
+void ZoneServer::SendAllSpawnsForLevelChange(Client* client){
 	map<int32, float>* client_range = GetClientRangeMap(client);
 
 	if (client_range) {
@@ -3897,7 +3923,7 @@ void ZoneServer::SendCalculatedXP(Player* player, Spawn* victim){
 		} else {
 			float xp = player->CalculateXP(victim);
 			if (xp > 0) {
-				shared_ptr<Client> client = GetClientBySpawn(player);
+				Client* client = GetClientBySpawn(player);
 
 				if (!client)
 					return;
@@ -3918,7 +3944,7 @@ void ZoneServer::SendCalculatedXP(Player* player, Spawn* victim){
 	}
 }
 
-void ZoneServer::ProcessFaction(Spawn* spawn, const shared_ptr<Client>& client)
+void ZoneServer::ProcessFaction(Spawn* spawn, Client* client)
 {
 	if(client && !spawn->IsPlayer() && spawn->GetFactionID() > 10)
 	{
@@ -4033,7 +4059,7 @@ void ZoneServer::KillSpawn(Spawn* dead, Spawn* killer, bool send_packet, int8 da
 		ClearHate(dead_entity);
 
 		if (dead->IsPlayer()) {
-			shared_ptr<Client> client = GetClientBySpawn(dead);
+			Client* client = GetClientBySpawn(dead);
 
 			if (client) {
 				if (client->GetPlayer()->DamageEquippedItems(client, 10)) {
@@ -4095,7 +4121,7 @@ void ZoneServer::KillSpawn(Spawn* dead, Spawn* killer, bool send_packet, int8 da
 
 					if (spawn->IsPlayer()) {
 						Player* player = static_cast<Player*>(spawn);
-						shared_ptr<Client> client = GetClientBySpawn(spawn);
+						Client* client = GetClientBySpawn(spawn);
 
 						player->UpdatePlayerStatistic(STAT_PLAYER_TOTAL_NPC_KILLS, 1);
 
@@ -4144,7 +4170,7 @@ void ZoneServer::KillSpawn(Spawn* dead, Spawn* killer, bool send_packet, int8 da
 			if (!killer_in_encounter) {
 				if (killer && killer->IsPlayer()) {
 					if (!dead->IsPlayer() && dead->GetFactionID() > 10) {
-						shared_ptr<Client> client = GetClientBySpawn(killer);
+						Client* client = GetClientBySpawn(killer);
 
 						if (client) {
 							ProcessFaction(dead, client);
@@ -4234,7 +4260,7 @@ void ZoneServer::KillSpawn(Spawn* dead, Spawn* killer, bool send_packet, int8 da
 
 void ZoneServer::SendDamagePacket(Spawn* attacker, Spawn* victim, int8 type1, int8 type2, int8 damage_type, int16 damage, const char* spell_name){
 	if (attacker && victim && victim->IsPlayer() && !victim->GetTarget()) {
-		shared_ptr<Client> client = GetClientBySpawn(victim);
+		Client* client = GetClientBySpawn(victim);
 
 		if (client) {
 			client->TargetSpawn(attacker);
@@ -4373,7 +4399,7 @@ void ZoneServer::SendThreatPacket(Spawn* caster, Spawn* target, int32 threat_amt
 	}
 }
 
-void ZoneServer::SendSpellFailedPacket(const shared_ptr<Client>& client, int16 error){
+void ZoneServer::SendSpellFailedPacket(Client* client, int16 error){
 	if(!client)
 		return;
 
@@ -4534,7 +4560,7 @@ void ZoneServer::SendCastEntityCommandPacket(EntityCommand* entity_command, int3
 	}
 }
 
-void ZoneServer::StartZoneInitialSpawnThread(shared_ptr<Client> client) {
+void ZoneServer::StartZoneInitialSpawnThread(Client* client) {
 	if (zoneShuttingDown)
 		return;
 
@@ -4542,7 +4568,7 @@ void ZoneServer::StartZoneInitialSpawnThread(shared_ptr<Client> client) {
 	w.detach();
 }
 
-void ZoneServer::SendZoneSpawns(const shared_ptr<Client>& client){
+void ZoneServer::SendZoneSpawns(Client* client){
 	initial_spawn_threads_active++;
 
 	map<int32, Spawn*>::iterator itr;
@@ -4577,9 +4603,9 @@ vector<Entity*> ZoneServer::GetPlayers(){
 
 Player*	ZoneServer::GetPlayerByID(int32 id) {
 	Player* ret = nullptr;
-	shared_ptr<Client> client = nullptr;
+	Client* client = nullptr;
 
-	for (const auto client : clients) {
+	for (const auto& client : clients) {
 		if (client && client->GetPlayer() && client->GetPlayer()->GetCharacterID() == id) {
 			ret = client->GetPlayer();
 			break;
@@ -4625,7 +4651,7 @@ int16 ZoneServer::SetSpawnTargetable(int32 spawn_id){
 	return ret_val;
 }
 
-EQ2Packet* ZoneServer::GetZoneInfoPacket(const shared_ptr<Client>& client) {
+EQ2Packet* ZoneServer::GetZoneInfoPacket(Client* client) {
 	client_spawn_map.Put(client->GetPlayer(), client);
 
 	PacketStruct* packet = configReader.getStruct("WS_ZoneInfo", client->GetVersion());
@@ -4963,7 +4989,7 @@ void ZoneServer::SendUpdateDefaultCommand(Spawn* spawn, const char* command, flo
 	}
 }
 
-void ZoneServer::CheckPlayerProximity(Spawn* spawn, shared_ptr<Client> client) {
+void ZoneServer::CheckPlayerProximity(Spawn* spawn, Client* client) {
 	if (player_proximities.count(spawn->GetID()) > 0) {
 		PlayerProximity* prox = player_proximities.Get(spawn->GetID());
 		
@@ -4994,7 +5020,7 @@ void ZoneServer::AddPlayerProximity(Spawn* spawn, float distance, string in_rang
 	player_proximities.Put(spawn->GetID(), prox);
 }
 
-void ZoneServer::RemovePlayerProximity(shared_ptr<Client> client){	
+void ZoneServer::RemovePlayerProximity(Client* client) {	
 	PlayerProximity* prox = 0;
 	MutexMap<int32, PlayerProximity*>::iterator itr = player_proximities.begin();
 	while(itr.Next()){
@@ -5069,11 +5095,11 @@ void ZoneServer::CheckLocationProximity() {
 										if (total_diff <= max_variation) {
 											in_range = true;
 
-											if (lua_interface && prox->in_range_lua_function.length() > 0 && prox->clients_in_proximity.count(client) == 0) { //Check Total
+											if (lua_interface && prox->in_range_lua_function.length() > 0 && prox->clients_in_proximity.count(client.get()) == 0) { //Check Total
 												lua_interface->RunZoneScript(zone_script, prox->in_range_lua_function.c_str(), this, client->GetPlayer());
 											}
 
-											prox->clients_in_proximity[client] = true;
+											prox->clients_in_proximity[client.get()] = true;
 										}
 									}
 								}
@@ -5081,11 +5107,11 @@ void ZoneServer::CheckLocationProximity() {
 						}
 
 						if (!in_range) {
-							if (lua_interface && prox->leaving_range_lua_function.length() > 0 && prox->clients_in_proximity.count(client) > 0) {
+							if (lua_interface && prox->leaving_range_lua_function.length() > 0 && prox->clients_in_proximity.count(client.get()) > 0) {
 								lua_interface->RunZoneScript(zone_script, prox->leaving_range_lua_function.c_str(), this, client->GetPlayer());
 							}
 
-							prox->clients_in_proximity.erase(client);
+							prox->clients_in_proximity.erase(client.get());
 						}
 					}
 				} catch (...) {
@@ -5282,7 +5308,7 @@ void ZoneServer::RemoveSpawnSupportFunctions(Spawn* spawn) {
 		movement_spawns.erase(spawn->GetID());
 }
 
-void ZoneServer::HandleEmote(const shared_ptr<Client>& originator, string name) {
+void ZoneServer::HandleEmote(Client* originator, string name) {
 	Emote* emote = visual_states.FindEmote(name);
 	if (!emote) {
 		originator->Message(CHANNEL_COLOR_YELLOW, "Unable to find emote '%s'.  If this should be a valid emote be sure to submit a /bug report.", name.c_str());
@@ -5403,7 +5429,7 @@ void ZoneServer::WritePlayerStatistics() {
 
 void ZoneServer::AddPlayerTracking(Player* player) {
 	if (player && !player->GetIsTracking() && players_tracking.count(player->GetDatabaseID()) == 0) {
-		shared_ptr<Client> client = GetClientBySpawn(player);
+		Client* client = GetClientBySpawn(player);
 
 		if (client) {
 			PacketStruct* packet = configReader.getStruct("WS_TrackingUpdate", client->GetVersion());
@@ -5422,7 +5448,7 @@ void ZoneServer::AddPlayerTracking(Player* player) {
 
 void ZoneServer::RemovePlayerTracking(Player* player, int8 mode) {
 	if (player && player->GetIsTracking()) {
-		shared_ptr<Client> client = GetClientBySpawn(player);
+		Client* client = GetClientBySpawn(player);
 
 		if (client) {
 			PacketStruct* packet = configReader.getStruct("WS_TrackingUpdate", client->GetVersion());
@@ -5447,7 +5473,7 @@ void ZoneServer::ProcessTracking() {
 	}*/
 }
 
-void ZoneServer::ProcessTracking(const shared_ptr<Client>& client) {
+void ZoneServer::ProcessTracking(Client* client) {
 	if (!client)
 		return;
 
@@ -5561,7 +5587,7 @@ void ZoneServer::ProcessAggroChecks(Spawn* spawn) {
 			CheckEnemyList(static_cast<NPC*>(spawn));
 }
 
-void ZoneServer::SendUpdateTitles(const shared_ptr<Client>& client, Title *suffix, Title *prefix) {
+void ZoneServer::SendUpdateTitles(Client* client, Title *suffix, Title *prefix) {
 	SendUpdateTitles(client->GetPlayer(), suffix, prefix);
 }
 
@@ -5783,14 +5809,14 @@ void ZoneServer::HidePrivateSpawns() {
 	lock_guard<mutex> guard(hide_spawns_mutex);
 
 	for (const auto spawn : hide_spawns) {
-		for (const auto client : clients) {
+		for (const auto& client : clients) {
 			Player* player = client->GetPlayer();
 
 			if (player->WasSentSpawn(spawn->GetID()) && !player->WasSpawnRemoved(spawn)) {
 				PacketStruct* packet = configReader.getStruct("WS_DestroyGhostCmd", client->GetVersion());
 
-				SendRemoveSpawn(client, spawn, packet);
-				RemoveFromClientRangeMap(client, spawn->GetID());
+				SendRemoveSpawn(client.get(), spawn, packet);
+				RemoveFromClientRangeMap(client.get(), spawn->GetID());
 
 				if (player->GetTarget() == spawn) {
 					player->SetTarget(0);
@@ -5819,7 +5845,7 @@ void ZoneServer::PlayAnimation(Spawn* spawn, int32 visual_state, Spawn* spawn2, 
 
 	if (spawn2) {
 		if (hide_type == 1) {
-			shared_ptr<Client> client = GetClientBySpawn(spawn2);
+			Client* client = GetClientBySpawn(spawn2);
 
 			if (client) {
 				PacketStruct* packet = configReader.getStruct("WS_CannedEmote", client->GetVersion());
@@ -5896,7 +5922,7 @@ vector<Spawn*> ZoneServer::GetAttackableSpawnsByDistance(Spawn* caster, float di
 	return ret;
 }
 
-void ZoneServer::ResurrectSpawn(Spawn* spawn, const shared_ptr<Client>& client) {
+void ZoneServer::ResurrectSpawn(Spawn* spawn, Client* client) {
 	if (!client || !spawn) {
 		return;
 	}
@@ -6165,13 +6191,13 @@ void SpawnLoop(ZoneServer* zs) {
 	}
 }
 
-void SendInitialSpawns(shared_ptr<Client> client) {
+void SendInitialSpawns(Client* client) {
 	if (client) {
 		client->GetCurrentZone()->SendZoneSpawns(client);
 	}
 }
 
-void ZoneServer::SetSpawnStructs(const shared_ptr<Client>& client) {
+void ZoneServer::SetSpawnStructs(Client* client) {
 	int16 client_ver = client->GetVersion();
 	Player* player = client->GetPlayer();
 
@@ -6792,7 +6818,7 @@ void ZoneServer::SendStateCommand(Spawn* spawn, int32 state) {
 
 	for (const auto& client : clients) {
 		if (client->GetPlayer()->WasSentSpawn(spawn->GetID()) && !client->GetPlayer()->WasSpawnRemoved(spawn)) {
-			ClientPacketFunctions::SendStateCommand(client, client->GetPlayer()->GetIDWithPlayerSpawn(spawn), state);
+			ClientPacketFunctions::SendStateCommand(client.get(), client->GetPlayer()->GetIDWithPlayerSpawn(spawn), state);
 		}
 	}
 }
@@ -6837,7 +6863,7 @@ void ZoneServer::DeleteFlightPaths() {
 	m_flightPaths.clear();
 }
 
-void ZoneServer::SendFlightPathsPackets(const shared_ptr<Client>& client) {
+void ZoneServer::SendFlightPathsPackets(Client* client) {
 	// Only send a packet if there are flight paths
 	if (m_flightPathRoutes.size() > 0) {
 		PacketStruct* packet = configReader.getStruct("WS_FlightPathsMsg", client->GetVersion());

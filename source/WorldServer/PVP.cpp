@@ -97,7 +97,12 @@ string PVP::GetRank(Player* player)
 }
 
 int PVP::GetRankIndex(Player* player) {
-	const char* rank = PVP::GetRank(player).c_str();
+    string str_rank = PVP::GetRank(player);
+	const char* rank = str_rank.c_str();
+
+	/*if (rank[0] == '\0') {
+		return 0;
+	}*/
 
 	if (strcmp(rank, "Dreadnaught") == 0) {
 		return 5;

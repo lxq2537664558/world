@@ -91,16 +91,14 @@ void SpellProcess::RemoveAllSpells(){
 	remove_target_list.clear();
 	MRemoveTargetList.releasewritelock(__FUNCTION__, __LINE__);
 
-	map<shared_ptr<Client>, HeroicOP*>::iterator solo_ho_itr;
 	MSoloHO.writelock(__FUNCTION__, __LINE__);
-	for (solo_ho_itr = m_soloHO.begin(); solo_ho_itr != m_soloHO.end(); solo_ho_itr++)
+	for (auto solo_ho_itr = m_soloHO.begin(); solo_ho_itr != m_soloHO.end(); ++solo_ho_itr)
 		safe_delete(solo_ho_itr->second);
 	m_soloHO.clear();
 	MSoloHO.releasewritelock(__FUNCTION__, __LINE__);
 
-	map<int32, HeroicOP*>::iterator group_ho_itr;
 	MGroupHO.writelock(__FUNCTION__, __LINE__);
-	for (group_ho_itr = m_groupHO.begin(); group_ho_itr != m_groupHO.end(); group_ho_itr++)
+	for (auto group_ho_itr = m_groupHO.begin(); group_ho_itr != m_groupHO.end(); ++group_ho_itr)
 		safe_delete(group_ho_itr->second);
 	m_groupHO.clear();
 	MGroupHO.releasewritelock(__FUNCTION__, __LINE__);
@@ -240,7 +238,7 @@ void SpellProcess::Process(){
 	for (auto cast_timer : finished_casts) {
 		if (!cast_timer->delete_timer) {
 			if (cast_timer->spell) {
-				shared_ptr<Client> client = cast_timer->zone->GetClientBySpawn(cast_timer->spell->caster);
+				Client* client = cast_timer->zone->GetClientBySpawn(cast_timer->spell->caster);
 
 				if (client) {
 					PacketStruct* packet = configReader.getStruct("WS_FinishCastSpell", client->GetVersion());
@@ -429,7 +427,7 @@ void SpellProcess::CheckInterrupt(InterruptStruct* interrupt){
 		return;
 
 	auto entity = static_cast<Entity*>(interrupt->interrupted);
-	shared_ptr<Client> client = entity->GetZone()->GetClientBySpawn(entity);
+	Client* client = entity->GetZone()->GetClientBySpawn(entity);
 
 	if (client) {
 		auto lua_spell = GetLuaSpell(entity);
@@ -567,7 +565,7 @@ bool SpellProcess::CastPassives(Spell* spell, Entity* caster, bool remove) {
 	return true;
 }
 
-void SpellProcess::SendStartCast(LuaSpell* spell, const shared_ptr<Client>& client){
+void SpellProcess::SendStartCast(LuaSpell* spell, Client* client){
 	if(client) {
 		PacketStruct* packet = configReader.getStruct("WS_StartCastSpell", client->GetVersion());
 
@@ -581,7 +579,7 @@ void SpellProcess::SendStartCast(LuaSpell* spell, const shared_ptr<Client>& clie
 	}
 }
 
-void SpellProcess::SendFinishedCast(LuaSpell* spell, const shared_ptr<Client>& client){
+void SpellProcess::SendFinishedCast(LuaSpell* spell, Client* client){
 	if (spell && spell->spell) {
 		float recast = spell->spell->GetModifiedRecast(spell->caster);
 
@@ -612,19 +610,19 @@ void SpellProcess::SendFinishedCast(LuaSpell* spell, const shared_ptr<Client>& c
  	}
 }
 
-void SpellProcess::LockAllSpells(const shared_ptr<Client>& client){
+void SpellProcess::LockAllSpells(Client* client){
 	if(client){
 		client->GetPlayer()->LockAllSpells();
 		SendSpellBookUpdate(client);
 	}
 }
 
-void SpellProcess::UnlockAllSpells(const shared_ptr<Client>& client){
+void SpellProcess::UnlockAllSpells(Client* client){
 	if(client)
 		client->GetPlayer()->UnlockAllSpells();
 }
 
-void SpellProcess::UnlockSpell(const shared_ptr<Client>& client, Spell* spell){
+void SpellProcess::UnlockSpell(Client* client, Spell* spell){
 	if(client && client->GetPlayer() && spell) {
 		if (!client->GetPlayer()->IsCasting()) {
 			client->GetPlayer()->UnlockSpell(spell);
@@ -761,7 +759,7 @@ void SpellProcess::AddSpellToQueue(Spell* spell, Entity* caster){
 
 		static_cast<Player*>(caster)->QueueSpell(spell);
 
-		shared_ptr<Client> client = caster->GetZone()->GetClientBySpawn(caster);
+		Client* client = caster->GetZone()->GetClientBySpawn(caster);
 		if (client) {
 			SendSpellBookUpdate(client);
 		}
@@ -777,7 +775,7 @@ void SpellProcess::RemoveSpellFromQueue(Spell* spell, Entity* caster){
 
 		static_cast<Player*>(caster)->UnQueueSpell(spell);
 
-		shared_ptr<Client> client = caster->GetZone()->GetClientBySpawn(caster);
+		Client* client = caster->GetZone()->GetClientBySpawn(caster);
 		if (client) {
 			SendSpellBookUpdate(client);
 		}
@@ -802,7 +800,7 @@ void SpellProcess::RemoveSpellFromQueue(Entity* caster, bool hostile_only) {
 
 				static_cast<Player*>(caster)->UnQueueSpell(spell);
 
-				shared_ptr<Client> client = caster->GetZone()->GetClientBySpawn(caster);
+				Client* client = caster->GetZone()->GetClientBySpawn(caster);
 				if (client) {
 					SendSpellBookUpdate(client);
 				}
@@ -837,7 +835,7 @@ void SpellProcess::CheckSpellQueue(Spell* spell, Entity* caster) {
 	}
 }
 
-void SpellProcess::SendSpellBookUpdate(const shared_ptr<Client>& client){
+void SpellProcess::SendSpellBookUpdate(Client* client){
 	if(client){
 		EQ2Packet* app = client->GetPlayer()->GetSpellBookUpdatePacket(client->GetVersion());
 		if(app)
@@ -928,7 +926,7 @@ bool SpellProcess::CanCast(shared_ptr<LuaSpell> lua_spell, bool harvest_spell = 
 	Spell* spell = lua_spell->spell;
 
 	if (caster && spell) {
-		shared_ptr<Client> client = nullptr;
+		Client* client = nullptr;
 		ZoneServer* zone = lua_spell->caster->GetZone();
 
 		if (zone) {
@@ -1153,7 +1151,7 @@ bool SpellProcess::CanCast(shared_ptr<LuaSpell> lua_spell, bool harvest_spell = 
 
 void SpellProcess::ProcessSpell(ZoneServer* zone, Spell* spell, Entity* caster, Spawn* target, bool harvest_spell, bool force_cast) {
 	if (spell && caster) {
-		shared_ptr<Client> client = nullptr;
+		Client* client = nullptr;
 		shared_ptr<LuaSpell> lua_spell = nullptr;
 
 		if (lua_interface)
@@ -1254,7 +1252,7 @@ void SpellProcess::ProcessSpell(ZoneServer* zone, Spell* spell, Entity* caster, 
 
 void SpellProcess::ProcessEntityCommand(ZoneServer* zone, EntityCommand* entity_command, Entity* caster, Spawn* target, bool lock) {
 	if (zone && entity_command && caster && target && !target->IsPlayer()) {
-		shared_ptr<Client> client = zone->GetClientBySpawn(caster);
+		Client* client = zone->GetClientBySpawn(caster);
 		if (caster->GetDistance(target) > entity_command->distance) {
 			zone->SendSpellFailedPacket(client, SPELL_ERROR_TOO_FAR_AWAY);
 			return;
@@ -1297,7 +1295,7 @@ bool SpellProcess::CastProcessedSpell(shared_ptr<LuaSpell> spell, bool passive) 
 		return false;
 	}
 
-	shared_ptr<Client> client = nullptr;
+	Client* client = nullptr;
 	bool hit_target = false;
 	bool living_target = false;
 
@@ -1496,7 +1494,7 @@ bool SpellProcess::CastProcessedSpell(shared_ptr<LuaSpell> spell, bool passive) 
 	return true;
 }
 
-bool SpellProcess::CastProcessedEntityCommand(EntityCommand* entity_command, const shared_ptr<Client>& client) {
+bool SpellProcess::CastProcessedEntityCommand(EntityCommand* entity_command, Client* client) {
 	bool ret = false;
 	if (entity_command && client) {
 		UnlockAllSpells(client);
@@ -1552,7 +1550,7 @@ void SpellProcess::Interrupted(Entity* caster, Spawn* interruptor, int16 error_c
 			}
 
 			if (interruptor && interruptor->IsPlayer()) {
-				shared_ptr<Client> client = interruptor->GetZone()->GetClientBySpawn(interruptor);
+				Client* client = interruptor->GetZone()->GetClientBySpawn(interruptor);
 
 				if (client) {
 					client->Message(CHANNEL_COLOR_SPELL_INTERRUPT, "You interrupt %s's ability to cast!", interruptor->GetName());
@@ -1693,7 +1691,7 @@ void SpellProcess::GetSpellTargets(LuaSpell* luaspell)
 
 							// if the group member is in the casters zone, and is alive
 							if (group_member->GetZone() == luaspell->caster->GetZone() && group_member->Alive() && caster->GetDistance(group_member) <= luaspell->spell->GetSpellData()->radius) {
-								shared_ptr<Client> client = caster->GetZone()->GetClientBySpawn(group_member);
+								Client* client = caster->GetZone()->GetClientBySpawn(group_member);
 
 								if (((Player*)group_member)->IsResurrecting() || !client || client->IsZoning())
 									continue;
@@ -2089,7 +2087,7 @@ void SpellProcess::CheckRemoveTargetFromSpell() {
 
 }
 
-bool SpellProcess::AddHO(shared_ptr<Client> client, HeroicOP* ho) {
+bool SpellProcess::AddHO(Client* client, HeroicOP* ho) {
 	bool ret = true;
 
 	if (client && ho) {

@@ -10,7 +10,7 @@ public:
 	bool Connect();
 	bool Connected() { return tcpc->Connected(); }
 	bool Process();
-	void SayHello();
+	void SayHello(int32 zone_id);
 
 private:
 	TCPConnection* tcpc;

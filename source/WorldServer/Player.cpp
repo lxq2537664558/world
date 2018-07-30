@@ -836,7 +836,7 @@ EQ2Packet* PlayerInfo::serialize(int16 version){
 			control_packet->setDataByName("speed", player->GetSpeed());
 			control_packet->setDataByName("air_speed", player->GetAirSpeed());
 			control_packet->setDataByName("size", 0.51);
-			shared_ptr<Client> client = player->GetZone()->GetClientBySpawn(player);
+			Client* client = player->GetZone()->GetClientBySpawn(player);
 			if (client)
 				client->QueuePacket(control_packet->serialize());
 			safe_delete(control_packet);
@@ -943,7 +943,7 @@ EQ2Packet* PlayerInfo::serializePet(int16 version) {
 	return 0;
 }
 
-bool Player::DamageEquippedItems(const shared_ptr<Client>& client, int8 amount) {
+bool Player::DamageEquippedItems(Client* client, int8 amount) {
 	bool ret = false;
 	int8 item_type;
 	Item* item = 0;
@@ -1173,7 +1173,7 @@ void Player::UnequipItem(int16 index, sint32 bag_id, int8 slot, int16 version) {
 		SetCharSheetChanged(true);
 	}
 
-	shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+	Client* client = GetZone()->GetClientBySpawn(this);
 	if (client) {
 		for (EQ2Packet* outapp : packets) {
 			if (outapp) {
@@ -1228,7 +1228,7 @@ EQ2Packet* Player::SwapEquippedItems(int8 slot1, int8 slot2, int16 version){
 }
 bool Player::CanEquipItem(Item* item) {
 	if (item) {
-		shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+		Client* client = GetZone()->GetClientBySpawn(this);
 		if (client) {
 			if (item->IsArmor() || item->IsWeapon() || item->IsFood() || item->IsRanged() || item->IsShield() || item->IsBauble() || item->IsAmmo() || item->IsThrown()) {
 				if ((item->generic_info.skill_req1 == 0 || item->generic_info.skill_req1 == 0xFFFFFFFF || skill_list.HasSkill(item->generic_info.skill_req1)) && (item->generic_info.skill_req2 == 0 || item->generic_info.skill_req2 == 0xFFFFFFFF || skill_list.HasSkill(item->generic_info.skill_req2))) {
@@ -1316,7 +1316,7 @@ void Player::EquipItem(int16 index, int16 version, int8 slot_id) {
 				int32 bag_id = item->details.inv_slot_id;
 
 				if (item->generic_info.condition == 0) {
-					shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+					Client* client = GetZone()->GetClientBySpawn(this);
 
 					if (client) {
 						client->Message(CHANNEL_COLOR_RED, "Your \\aITEM %u %u:%s\\/a is worn out and will not be effective until repaired.", item->details.item_id, item->details.unique_id, item->name.c_str());
@@ -1344,7 +1344,7 @@ void Player::EquipItem(int16 index, int16 version, int8 slot_id) {
 		}
 	}
 
-	shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+	Client* client = GetZone()->GetClientBySpawn(this);
 	if (client) {
 		for (EQ2Packet* outapp : packets) {
 			if (outapp) {
@@ -2240,7 +2240,7 @@ void Player::RemoveMaintainedSpell(shared_ptr<LuaSpell> luaspell){
 	}
 
 	bool found = false;
-	shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+	Client* client = GetZone()->GetClientBySpawn(this);
 
 	GetMaintainedMutex()->writelock(__FUNCTION__, __LINE__);
 	for(int i=0;i<30;i++){
@@ -3122,7 +3122,7 @@ void Player::CheckQuestsCraftUpdate(Item* item, int32 qty){
 	}
 	MPlayerQuests.unlock();
 	if(update_list && update_list->size() > 0){
-		shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+		Client* client = GetZone()->GetClientBySpawn(this);
 		if(client){
 			for(int8 i=0;i<update_list->size(); i++){
 				client->SendQuestUpdate(update_list->at(i));
@@ -3149,7 +3149,7 @@ void Player::CheckQuestsHarvestUpdate(Item* item, int32 qty){
 	}
 	MPlayerQuests.unlock();
 	if(update_list && update_list->size() > 0){
-		shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+		Client* client = GetZone()->GetClientBySpawn(this);
 		if(client){
 			for(int8 i=0;i<update_list->size(); i++){
 				client->SendQuestUpdate(update_list->at(i));
@@ -4682,7 +4682,7 @@ void Player::AddPassiveSpell(int32 id, int8 tier)
 	// player has instead of going through all their spells.
 	passive_spells.push_back(id);
 
-	shared_ptr<Client> client = GetZone()->GetClientBySpawn(this);
+	Client* client = GetZone()->GetClientBySpawn(this);
 
 	// Don not apply passives if the client is null, zoning, or reviving
 	if (client == NULL || client->IsZoning() || IsResurrecting())
@@ -4994,7 +4994,7 @@ void Player::SendQuestRequiredSpawns(int32 quest_id){
 	if (player_spawn_quests_required.size() > 0) {
 		ZoneServer* zone = GetZone();
 
-		shared_ptr<Client> client = zone->GetClientBySpawn(this);
+		Client* client = zone->GetClientBySpawn(this);
 
 		if (!client) {
 			m_playerSpawnQuestsRequired.releasereadlock(__FUNCTION__, __LINE__);
@@ -5032,7 +5032,7 @@ void Player::SendHistoryRequiredSpawns(int32 event_id) {
 
 	if (player_spawn_history_required.size() > 0) {
 		ZoneServer* zone = GetZone();
-		shared_ptr<Client> client = zone->GetClientBySpawn(this);
+		Client* client = zone->GetClientBySpawn(this);
 
 		if (!client) {
 			m_playerSpawnHistoryRequired.releasereadlock(__FUNCTION__, __LINE__);
@@ -5152,7 +5152,7 @@ void PlayerControlFlags::SetPlayerControlFlag(int8 param, int8 param_value, bool
 	MControlFlags.releasewritelock(__FUNCTION__, __LINE__);
 }
 
-void PlayerControlFlags::SendControlFlagUpdates(const shared_ptr<Client>& client){
+void PlayerControlFlags::SendControlFlagUpdates(Client* client){
 	if (!client)
 		return;
 
@@ -5180,7 +5180,7 @@ void Player::SetPlayerControlFlag(int8 param, int8 param_value, bool is_active){
 	control_flags.SetPlayerControlFlag(param, param_value, is_active);
 }
 
-void Player::SendControlFlagUpdates(const shared_ptr<Client>& client){
+void Player::SendControlFlagUpdates(Client* client){
 	control_flags.SendControlFlagUpdates(client);
 }
 

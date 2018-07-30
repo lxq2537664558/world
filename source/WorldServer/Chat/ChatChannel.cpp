@@ -37,13 +37,10 @@ bool ChatChannel::IsInChannel(int32 character_id) {
 	return false;
 }
 
-bool ChatChannel::JoinChannel(const shared_ptr<Client>& client) {
-	PacketStruct *packet_struct;
-	vector<int32>::iterator itr;
-	shared_ptr<Client> to_client;
+bool ChatChannel::JoinChannel(Client* client) {
+	PacketStruct* packet_struct = configReader.getStruct("WS_ChatChannelUpdate", client->GetVersion());
 
-	//send the player join packet to the joining client
-	if ((packet_struct = configReader.getStruct("WS_ChatChannelUpdate", client->GetVersion())) == NULL) {
+	if (!packet_struct) {
 		LogWrite(CHAT__ERROR, 0, "Chat", "Could not find packet 'WS_ChatChannelUpdate' when client %s was trying to join channel %s", client->GetPlayer()->GetName(), name);
 		return false;
 	}
@@ -52,18 +49,25 @@ bool ChatChannel::JoinChannel(const shared_ptr<Client>& client) {
 	packet_struct->setDataByName("channel_name", name);
 	client->QueuePacket(packet_struct->serialize());
 	safe_delete(packet_struct);
+
 	clients.push_back(client->GetCharacterID());
 
-	//loop through everyone else in the channel and send the "other" player join packet
-	for (itr = clients.begin(); itr != clients.end(); itr++) {
-		if (client->GetCharacterID() == *itr)
+	for (auto itr = clients.begin(); itr != clients.end(); ++itr) {
+		if (client->GetCharacterID() == *itr) {
 			continue;
+		}
 
-		if ((to_client = zone_list.GetClientByCharID(*itr)) == NULL)
-			continue;
+	    Client* to_client = zone_list.GetClientByCharID((*itr));
 
-		if ((packet_struct = configReader.getStruct("WS_ChatChannelUpdate", to_client->GetVersion())) == NULL)
+		if (!to_client) {
 			continue;
+		}
+
+		packet_struct = configReader.getStruct("WS_ChatChannelUpdate", to_client->GetVersion());
+
+		if (!packet_struct) {
+			continue;
+		}
 
 		packet_struct->setDataByName("action", CHAT_CHANNEL_OTHER_JOIN);
 		packet_struct->setDataByName("channel_name", name);
@@ -75,13 +79,10 @@ bool ChatChannel::JoinChannel(const shared_ptr<Client>& client) {
 	return true;
 }
 
-bool ChatChannel::LeaveChannel(const shared_ptr<Client>& client) {
-	vector<int32>::iterator itr;
-	PacketStruct *packet_struct;
-	shared_ptr<Client> to_client;
+bool ChatChannel::LeaveChannel(Client* client) {
 	bool ret = false;
 
-	for (itr = clients.begin(); itr != clients.end(); itr++) {
+	for (auto itr = clients.begin(); itr != clients.end(); ++itr) {
 		if (client->GetCharacterID() == *itr) {
 			clients.erase(itr);
 			ret = true;
@@ -90,9 +91,11 @@ bool ChatChannel::LeaveChannel(const shared_ptr<Client>& client) {
 	}
 
 	if (ret) {
-		//send the packet to the leaving client
-		if ((packet_struct = configReader.getStruct("WS_ChatChannelUpdate", client->GetVersion())) == NULL)
+		PacketStruct* packet_struct = configReader.getStruct("WS_ChatChannelUpdate", client->GetVersion());
+
+		if (!packet_struct) {
 			return false;
+		}
 
 		packet_struct->setDataByName("action", CHAT_CHANNEL_LEAVE);
 		packet_struct->setDataByName("channel_name", name);
@@ -100,13 +103,18 @@ bool ChatChannel::LeaveChannel(const shared_ptr<Client>& client) {
 		client->QueuePacket(packet_struct->serialize());
 		safe_delete(packet_struct);
 
-		//send the leave packet to all other clients in the channel
-		for (itr = clients.begin(); itr != clients.end(); itr++) {
-			if ((to_client = zone_list.GetClientByCharID(*itr)) == NULL)
-				continue;
+		for (auto itr = clients.begin(); itr != clients.end(); ++itr) {
+		    Client* to_client = zone_list.GetClientByCharID((*itr));
 
-			if ((packet_struct = configReader.getStruct("WS_ChatChannelUpdate", to_client->GetVersion())) == NULL)
+			if (!to_client) {
 				continue;
+			}
+
+			packet_struct = configReader.getStruct("WS_ChatChannelUpdate", to_client->GetVersion());
+
+			if (!packet_struct) {
+				continue;
+			}
 
 			packet_struct->setDataByName("action", CHAT_CHANNEL_OTHER_LEAVE);
 			packet_struct->setDataByName("channel_name", name);
@@ -119,25 +127,29 @@ bool ChatChannel::LeaveChannel(const shared_ptr<Client>& client) {
 	return ret;
 }
 
-bool ChatChannel::TellChannel(const shared_ptr<Client>& client, const char *message, const char* name2) {
-	vector<int32>::iterator itr;
-	PacketStruct *packet_struct;
-	shared_ptr<Client> to_client;
+bool ChatChannel::TellChannel(Client* client, const char *message, const char* name2) {
+	for (auto itr = clients.begin(); itr != clients.end(); ++itr) {
+	    Client* to_client = zone_list.GetClientByCharID(*itr);
 
-	for (itr = clients.begin(); itr != clients.end(); itr++) {
-		if ((to_client = zone_list.GetClientByCharID(*itr)) == NULL)
+		if (!to_client) {
 			continue;
-		if ((packet_struct = configReader.getStruct("WS_HearChat", to_client->GetVersion())) == NULL)
+		}
+
+		PacketStruct* packet_struct = configReader.getStruct("WS_HearChat", to_client->GetVersion());
+
+		if (!packet_struct) {
 			continue;
+		}
 
 		packet_struct->setDataByName("unknown", 0);
 		packet_struct->setDataByName("from_spawn_id", 0xFFFFFFFF);
 		packet_struct->setDataByName("to_spawn_id", 0xFFFFFFFF);
 
-		if (client)
+		if (client) {
 			packet_struct->setDataByName("from", client->GetPlayer()->GetName());
-		else
+		} else {
 			packet_struct->setDataByName("from", name2);
+		}
 
 		packet_struct->setDataByName("to", to_client->GetPlayer()->GetName());
 		packet_struct->setDataByName("channel", 34);
@@ -155,7 +167,7 @@ bool ChatChannel::TellChannel(const shared_ptr<Client>& client, const char *mess
 	return true;
 }
 
-bool ChatChannel::TellChannelClient(const shared_ptr<Client>& to_client, const char* message, const char* name2) {
+bool ChatChannel::TellChannelClient(Client* to_client, const char* message, const char* name2) {
 	PacketStruct *packet_struct;
 
 	if (string(name2).find('[') != string::npos)
@@ -183,23 +195,27 @@ bool ChatChannel::TellChannelClient(const shared_ptr<Client>& to_client, const c
 	return true;
 }
 
-bool ChatChannel::SendChannelUserList(const shared_ptr<Client>& client) {
+bool ChatChannel::SendChannelUserList(Client* client) {
 	vector<int32>::iterator itr;
-	PacketStruct *packet_struct;
-	shared_ptr<Client> to_client;
+	PacketStruct* packet_struct = configReader.getStruct("WS_WhoChannelQueryReply", client->GetVersion());
 	int8 i = 0;
 
-	if ((packet_struct = configReader.getStruct("WS_WhoChannelQueryReply", client->GetVersion())) == NULL)
+	if (!packet_struct) {
 		return false;
+	}
 
 	packet_struct->setDataByName("channel_name", name);
 	packet_struct->setDataByName("unknown", 0);
 	packet_struct->setArrayLengthByName("num_players", clients.size());
-	for (itr = clients.begin(); itr != clients.end(); itr++) {
-		if ((to_client = zone_list.GetClientByCharID(*itr)) != NULL)
+
+	for (auto itr = clients.begin(); itr != clients.end(); ++itr) {
+		Client* to_client = zone_list.GetClientByCharID((*itr));
+
+		if (to_client) {
 			packet_struct->setArrayDataByName("player_name", client->GetPlayer()->GetName(), i++);
-		else
+		} else {
 			packet_struct->setArrayDataByName("player_name", "<Unknown>", i++);
+		}
 	}
 
 	client->QueuePacket(packet_struct->serialize());

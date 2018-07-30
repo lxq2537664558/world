@@ -178,7 +178,7 @@ int32 Commands::GetSpawnSetType(string val){
 	return 0xFFFFFFFF;
 }
 
-bool Commands::SetSpawnCommand(const shared_ptr<Client>& client, Spawn* target, int8 type, const char* value, bool send_update, bool temporary, string* temp_value){
+bool Commands::SetSpawnCommand(Client* client, Spawn* target, int8 type, const char* value, bool send_update, bool temporary, string* temp_value){
 	if(!target)
 		return false;
 	int32 val = 0;
@@ -783,7 +783,7 @@ bool Commands::SetSpawnCommand(const shared_ptr<Client>& client, Spawn* target, 
 
 /* The zone object will be NULL if the zone is not currently running.  We pass both of these in so we can update 
    the database fields always and also update the zone in memory if it's running. */
-bool Commands::SetZoneCommand(const shared_ptr<Client>& client, int32 zone_id, ZoneServer* zone, int8 type, const char* value) {
+bool Commands::SetZoneCommand(Client* client, int32 zone_id, ZoneServer* zone, int8 type, const char* value) {
 	if (client && zone_id > 0 && type > 0 && value) {
 		sint32 int_value = 0;
 		float float_value = 0;
@@ -968,7 +968,7 @@ bool Commands::SetZoneCommand(const shared_ptr<Client>& client, int32 zone_id, Z
 	return true;
 }
 
-void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared_ptr<Client>& client){
+void Commands::Process(int32 index, EQ2_16BitString* command_parms, Client* client){
 	if(index>=remote_commands->commands.size()){
 		LogWrite(COMMAND__ERROR, 0, "Command", "Error, command handler of %u was requested, but max handler is %u", index, remote_commands->commands.size());
 		return;
@@ -1925,19 +1925,24 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 			client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Success!");
 			break;
 										}
-		case COMMAND_RELOADLUASYSTEM:{
+		case COMMAND_RELOADLUASYSTEM: {
 			client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Attempting to reload entire LUA system....");
-			map<shared_ptr<Client>, int32> debug_clients = lua_interface->GetDebugClients();
-			safe_delete(lua_interface);
-			lua_interface = new LuaInterface();
-			if(lua_interface)
-				lua_interface->SetSpawnScriptsReloading(true);
 
-			if(lua_interface && debug_clients.size() > 0){
-				map<shared_ptr<Client>, int32>::iterator itr;
-				for(itr = debug_clients.begin(); itr != debug_clients		.end(); itr++){
-					if(lua_interface)
-						lua_interface->UpdateDebugClients(itr->first);
+			map<Client*, int32> debug_clients = lua_interface->GetDebugClients();
+
+			safe_delete(lua_interface);
+
+			lua_interface = new LuaInterface();
+
+			if (lua_interface) {
+				lua_interface->SetSpawnScriptsReloading(true);
+			}
+
+			if (lua_interface && debug_clients.size() > 0){
+				for (auto itr = debug_clients.begin(); itr != debug_clients.end(); ++itr) {
+					if (lua_interface) {
+                        lua_interface->UpdateDebugClients(itr->first);
+                    }
 				}
 			}
 
@@ -1953,7 +1958,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 			master_spell_list.Reload();
 			int32 spell_count = 0;
 
-			if(lua_interface) {
+			if (lua_interface) {
 				lua_interface->DestroySpawnScripts();
 				lua_interface->DestroySpells();
 				spell_count = database.LoadSpellScriptData();
@@ -1963,7 +1968,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 
 			client->Message(CHANNEL_COLOR_YELLOW, "Successfully loaded %u spell(s), %u quest(s).", spell_count, quest_count);
 			break;
-									 }
+		}
 		case COMMAND_DECLINE_QUEST:{
 			int32 quest_id = 0;
 			if(sep && sep->arg[0] && sep->IsNumber(0))
@@ -2037,7 +2042,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 		}
 		case COMMAND_GROUPINVITE: {
 			Entity* target = 0;
-			shared_ptr<Client> target_client = 0;
+			Client* target_client = 0;
 
 			if (client->GetPlayer()->GetGroupMemberInfo() && !client->GetPlayer()->GetGroupMemberInfo()->leader) {
 				client->SimpleMessage(CHANNEL_COMMANDS, "You must be the group leader to invite.");
@@ -2200,7 +2205,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 		}
 		case COMMAND_GROUP_KICK:{
 			Entity* kicked = 0;
-			shared_ptr<Client> kicked_client = 0;
+			Client* kicked_client = 0;
 			int32 group_id = 0;
 
 			if (!client->GetPlayer()->GetGroupMemberInfo() || !client->GetPlayer()->GetGroupMemberInfo()->leader)
@@ -2241,7 +2246,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 			}
 
 			if (sep && sep->arg[0] && strlen(sep->arg[0]) > 1) {
-				shared_ptr<Client> new_leader = zone_list.GetClientByCharName(sep->arg[0]);
+				Client* new_leader = zone_list.GetClientByCharName(sep->arg[0]);
 				if (new_leader) {
 					if (client->GetPlayer()->IsGroupMember(new_leader->GetPlayer())) {
 						world.GetGroupManager()->MakeLeader(client->GetPlayer()->GetGroupMemberInfo()->group_id, new_leader->GetPlayer());
@@ -3338,7 +3343,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 					else if (new_status > client->GetAdminStatus())
 						client->SimpleMessage(CHANNEL_ERROR, "Unable to flag character.  Reason: New status is higher then your status.");
 					else{
-						shared_ptr<Client> client2 = client->GetCurrentZone()->GetClientByName(sep->arg[0]);
+						Client* client2 = client->GetCurrentZone()->GetClientByName(sep->arg[0]);
 						if (!client2)
 							client2 = zone_list.GetClientByCharName(sep->arg[0]);
 						
@@ -3449,7 +3454,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 				if (sep == 0 || sep->arg[0] == 0) {
 					client->SimpleMessage(CHANNEL_COLOR_RED, "/kick [name]");
 				} else {
-					shared_ptr<Client> kickClient = zone_list.GetClientByCharName(string(sep->arg[0]));
+					Client* kickClient = zone_list.GetClientByCharName(string(sep->arg[0]));
 
 					if (kickClient == client) {
 						client->Message(CHANNEL_COLOR_RED, "You can't kick yourself!");
@@ -3487,7 +3492,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 				}
 				else
 				{
-					shared_ptr<Client> kickClient = zone_list.GetClientByCharName(sep->arg[0]);
+					Client* kickClient = zone_list.GetClientByCharName(sep->arg[0]);
 
 					if ( kickClient == client )
 					{
@@ -3538,7 +3543,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 		case COMMAND_GIVEITEM:{
 
 			if(sep && sep->arg[0][0] && sep->arg[0][1] && sep->IsNumber(1)){
-				shared_ptr<Client> itemToClient = zone_list.GetClientByCharName(sep->arg[0]);
+				Client* itemToClient = zone_list.GetClientByCharName(sep->arg[0]);
 
 				if ( itemToClient == NULL )
 					client->Message(CHANNEL_COLOR_YELLOW,"Could not find %s.",sep->arg[0]);
@@ -3764,7 +3769,7 @@ void Commands::Process(int32 index, EQ2_16BitString* command_parms, const shared
 	Params	: Spell ID
 	Dev		: Jabantiz
 */ 
-void Commands::Command_AcceptAdvancement(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_AcceptAdvancement(Client* client, Seperator* sep)
 {
 	 Player *player = client->GetPlayer();
 	TraitData* trait = master_trait_list.GetTrait(atoul(sep->arg[0]));
@@ -3797,7 +3802,7 @@ void Commands::Command_AcceptAdvancement(const shared_ptr<Client>& client, Seper
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_AFK(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_AFK(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -3837,7 +3842,7 @@ void Commands::Command_AFK(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: Scatman
 	Example	: /appearance list
 */ 
-void Commands::Command_Appearance(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_Appearance(Client* client, Seperator* sep, int handler)
 {
 	if( handler == COMMAND_APPEARANCE )
 	{
@@ -3881,7 +3886,7 @@ void Commands::Command_Appearance(const shared_ptr<Client>& client, Seperator* s
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_Claim(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Claim(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0)) 
 	{
@@ -3899,7 +3904,7 @@ void Commands::Command_Claim(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_ClearAllQueued(const shared_ptr<Client>& client)
+void Commands::Command_ClearAllQueued(Client* client)
 {
 	ZoneServer* zone = client->GetPlayer()->GetZone();
 	if (zone && zone->GetSpellProcess())
@@ -3913,7 +3918,7 @@ void Commands::Command_ClearAllQueued(const shared_ptr<Client>& client)
 	Dev		: Zcoretri
 	Example	: /cancel_maintained 1 - would cancel the spell in slot 1 of Maintained Spells list
 */ 
-void Commands::Command_CancelMaintained(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_CancelMaintained(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0)) 
 	{
@@ -3933,14 +3938,14 @@ void Commands::Command_CancelMaintained(const shared_ptr<Client>& client, Sepera
 	Dev		: Zcoretri
 	Example	: 
 */ 
-void Commands::Command_Create(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Create(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_CREATE");
 	client->SendRecipeList();
 	client->ShowRecipeBook();
 }
 
-void Commands::Command_CreateFromRecipe(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_CreateFromRecipe(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_CREATEFROMRECIPE");
 	if (sep && sep->arg[0] && sep->IsNumber(0))
@@ -3954,7 +3959,7 @@ void Commands::Command_CreateFromRecipe(const shared_ptr<Client>& client, Sepera
 	Dev		: Scatman
 	Example	: /distance
 */ 
-void Commands::Command_Distance(const shared_ptr<Client>& client)
+void Commands::Command_Distance(Client* client)
 {
 	Spawn* target = client->GetPlayer()->GetTarget();
 
@@ -3971,7 +3976,7 @@ void Commands::Command_Distance(const shared_ptr<Client>& client)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_Duel(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Duel(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUEL");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Duel Command");
@@ -3985,7 +3990,7 @@ void Commands::Command_Duel(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_DuelBet(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_DuelBet(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUELBET");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Duel Bet Command");
@@ -3999,7 +4004,7 @@ void Commands::Command_DuelBet(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_DuelAccept(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_DuelAccept(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUEL_ACCEPT");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Accept Duel Command");
@@ -4013,7 +4018,7 @@ void Commands::Command_DuelAccept(const shared_ptr<Client>& client, Seperator* s
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_DuelDecline(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_DuelDecline(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUEL_DECLINE");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Decline Duel Request Command");
@@ -4027,7 +4032,7 @@ void Commands::Command_DuelDecline(const shared_ptr<Client>& client, Seperator* 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_DuelSurrender(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_DuelSurrender(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUEL_SURRENDER");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Surrender Duel Command");
@@ -4046,7 +4051,7 @@ void Commands::Command_DuelSurrender(const shared_ptr<Client>& client, Seperator
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_DuelToggle(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_DuelToggle(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_DUEL");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Duel Commands");
@@ -4060,7 +4065,7 @@ void Commands::Command_DuelToggle(const shared_ptr<Client>& client, Seperator* s
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_EntityCommand(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_EntityCommand(Client* client, Seperator* sep, int handler)
 {
 	if( handler == COMMAND_ENTITYCOMMAND )
 	{
@@ -4105,7 +4110,7 @@ void Commands::Command_EntityCommand(const shared_ptr<Client>& client, Seperator
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_Follow(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Follow(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_FOLLOW");
 	// flag to toggle if the players target is in the players group
@@ -4148,7 +4153,7 @@ void Commands::Command_Follow(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_StopFollow(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_StopFollow(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_STOP_FOLLOW");
 	if (client->GetPlayer()->GetFollowTarget()) {
@@ -4167,7 +4172,7 @@ void Commands::Command_StopFollow(const shared_ptr<Client>& client, Seperator* s
 	Dev		: Scatman
 	Example	: /grid
 */ 
-void Commands::Command_Grid(const shared_ptr<Client>& client)
+void Commands::Command_Grid(Client* client)
 {
 	client->Message(CHANNEL_COLOR_YELLOW, "Your Grid ID is %u", client->GetPlayer()->appearance.pos.grid_id);
 
@@ -4182,7 +4187,7 @@ void Commands::Command_Grid(const shared_ptr<Client>& client)
 	Purpose	: Handler for all UI-related guild commands
 	Dev		: Scatman
 */ 
-void Commands::Command_Guild(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Guild(Client* client, Seperator* sep)
 {
 	Guild* guild = client->GetPlayer()->GetGuild();
 
@@ -4302,7 +4307,7 @@ void Commands::Command_Guild(const shared_ptr<Client>& client, Seperator* sep)
 
 			if (pgi && pgi->guild && pgi->invited_by)
 			{
-				shared_ptr<Client> client_inviter = pgi->invited_by->GetZone()->GetClientBySpawn(pgi->invited_by);
+				Client* client_inviter = pgi->invited_by->GetZone()->GetClientBySpawn(pgi->invited_by);
 
 				if (client_inviter)
 					client_inviter->Message(CHANNEL_COLOR_WHITE, "%s has declined your invitation to join %s.", client->GetPlayer()->GetName(), pgi->guild->GetName());
@@ -4367,7 +4372,7 @@ void Commands::Command_Guild(const shared_ptr<Client>& client, Seperator* sep)
 	Purpose	: Display's in-game Guild Creation window
 	Dev		: Scatman
 */ 
-void Commands::Command_CreateGuild(const shared_ptr<Client>& client)
+void Commands::Command_CreateGuild(Client* client)
 {
 	client->SendGuildCreateWindow();
 }
@@ -4377,7 +4382,7 @@ void Commands::Command_CreateGuild(const shared_ptr<Client>& client)
 	Purpose	: 
 	Dev		: Scatman
 */ 
-void Commands::Command_SetGuildOfficerNote(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_SetGuildOfficerNote(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->arg[1]) 
 	{
@@ -4393,7 +4398,7 @@ void Commands::Command_SetGuildOfficerNote(const shared_ptr<Client>& client, Sep
 	Purpose	: 
 	Dev		: Scatman
 */ 
-void Commands::Command_SetGuildMemberNote(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_SetGuildMemberNote(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->arg[1]) 
 	{
@@ -4409,7 +4414,7 @@ void Commands::Command_SetGuildMemberNote(const shared_ptr<Client>& client, Sepe
 	Purpose	: 
 	Dev		: Scatman
 */ 
-void Commands::Command_GuildSay(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_GuildSay(Client* client, Seperator* sep)
 {
 	Guild* guild = client->GetPlayer()->GetGuild();
 
@@ -4427,7 +4432,7 @@ void Commands::Command_GuildSay(const shared_ptr<Client>& client, Seperator* sep
 	Purpose	: 
 	Dev		: Scatman
 */ 
-void Commands::Command_OfficerSay(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_OfficerSay(Client* client, Seperator* sep)
 {
 	Guild* guild = client->GetPlayer()->GetGuild();
 
@@ -4447,7 +4452,7 @@ void Commands::Command_OfficerSay(const shared_ptr<Client>& client, Seperator* s
 	Dev		: Scatman
 	Example	: 
 */ 
-void Commands::Command_Guilds(const shared_ptr<Client>& client)
+void Commands::Command_Guilds(Client* client)
 {
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /guilds [create|delete|add|remove|list]");
 }
@@ -4459,7 +4464,7 @@ void Commands::Command_Guilds(const shared_ptr<Client>& client)
 	Dev		: Scatman
 	Example	: /guilds add 1 Admin  = adds player Admin to guild_id 1
 */ 
-void Commands::Command_GuildsAdd(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_GuildsAdd(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && strlen(sep->arg[0]) > 0) 
 	{
@@ -4488,7 +4493,7 @@ void Commands::Command_GuildsAdd(const shared_ptr<Client>& client, Seperator* se
 		}
 		if (found) 
 		{
-			shared_ptr<Client> to_client = 0;
+			Client* to_client = 0;
 
 			if (sep->arg[1] && strlen(sep->arg[1]) > 0)
 				to_client = zone_list.GetClientByCharName(string(sep->arg[1]));
@@ -4512,7 +4517,7 @@ void Commands::Command_GuildsAdd(const shared_ptr<Client>& client, Seperator* se
 	Dev		: Scatman
 	Example	: /guilds create [guild name] (player name)
 */ 
-void Commands::Command_GuildsCreate(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_GuildsCreate(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0]) 
 	{
@@ -4524,7 +4529,7 @@ void Commands::Command_GuildsCreate(const shared_ptr<Client>& client, Seperator*
 
 			if (sep->arg[1] && strlen(sep->arg[1]) > 0) 
 			{
-				shared_ptr<Client> to_client = zone_list.GetClientByCharName(string(sep->arg[1]));
+				Client* to_client = zone_list.GetClientByCharName(string(sep->arg[1]));
 
 				if (to_client) 
 				{
@@ -4536,7 +4541,7 @@ void Commands::Command_GuildsCreate(const shared_ptr<Client>& client, Seperator*
 			}
 			else if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer()) 
 			{
-				shared_ptr<Client> to_client = client->GetPlayer()->GetTarget()->GetZone()->GetClientBySpawn(client->GetPlayer()->GetTarget());
+				Client* to_client = client->GetPlayer()->GetTarget()->GetZone()->GetClientBySpawn(client->GetPlayer()->GetTarget());
 
 				if (to_client) 
 				{
@@ -4569,7 +4574,7 @@ void Commands::Command_GuildsCreate(const shared_ptr<Client>& client, Seperator*
 	Dev		: Scatman
 	Example	: /guilds delete Test
 */ 
-void Commands::Command_GuildsDelete(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_GuildsDelete(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0]) 
 	{
@@ -4617,7 +4622,7 @@ void Commands::Command_GuildsDelete(const shared_ptr<Client>& client, Seperator*
 	Dev		: Scatman
 	Example	: /guilds list
 */ 
-void Commands::Command_GuildsList(const shared_ptr<Client>& client)
+void Commands::Command_GuildsList(Client* client)
 {
 	MutexMap<int32, Guild*>* guilds = guild_list.GetGuilds();
 	MutexMap<int32, Guild*>::iterator itr = guilds->begin();
@@ -4639,7 +4644,7 @@ void Commands::Command_GuildsList(const shared_ptr<Client>& client)
 	Dev		: Scatman
 	Example	:  /guilds remove 1 Admin = removes Admin from guild 1
 */ 
-void Commands::Command_GuildsRemove(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_GuildsRemove(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && strlen(sep->arg[0]) > 0) 
 	{
@@ -4669,7 +4674,7 @@ void Commands::Command_GuildsRemove(const shared_ptr<Client>& client, Seperator*
 
 		if (found) 
 		{
-			shared_ptr<Client> to_client = 0;
+			Client* to_client = 0;
 
 			if (sep->arg[1] && strlen(sep->arg[1]) > 0)
 				to_client = zone_list.GetClientByCharName(string(sep->arg[1]));
@@ -4706,11 +4711,11 @@ void Commands::Command_GuildsRemove(const shared_ptr<Client>& client, Seperator*
 	Dev		: Scatman
 	Example	: /inspect Scatman
 */ 
-void Commands::Command_InspectPlayer(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_InspectPlayer(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0]) 
 	{
-		shared_ptr<Client> inspect_client = zone_list.GetClientByCharName(string(sep->arg[0]));
+		Client* inspect_client = zone_list.GetClientByCharName(string(sep->arg[0]));
 
 		if (inspect_client)
 			client->InspectPlayer(inspect_client->GetPlayer());
@@ -4731,7 +4736,7 @@ void Commands::Command_InspectPlayer(const shared_ptr<Client>& client, Seperator
 	Dev		: All
 	Example	: /inventory delete item_id
 */ 
-void Commands::Command_Inventory(const shared_ptr<Client>& client, Seperator* sep, EQ2_RemoteCommandString* command)
+void Commands::Command_Inventory(Client* client, Seperator* sep, EQ2_RemoteCommandString* command)
 {
 
 	PrintSep(sep, "Command_Inventory"); // temp to figure out the params
@@ -4974,7 +4979,7 @@ void Commands::Command_Inventory(const shared_ptr<Client>& client, Seperator* se
 	Dev		: Scatman
 	Example	: /irc say #Channel Hello World!
 */ 
-void Commands::Command_IRC(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_IRC(Client* client, Seperator* sep)
 {
 	if (!rule_manager.GetGlobalRule(R_World, IRCEnabled)->GetBool()) {
 		client->SimpleMessage(CHANNEL_STATUS, "IRC is currently disabled on this server");
@@ -5027,7 +5032,7 @@ void Commands::Command_IRC(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: Zcoretri
 	Example	: 
 */ 
-void Commands::Command_Languages(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Languages(Client* client, Seperator* sep)
 {
 	list<Language*>* languages = client->GetPlayer()->GetPlayerLanguages()->GetAllLanguages();
 	list<Language*>::iterator itr;
@@ -5048,7 +5053,7 @@ void Commands::Command_Languages(const shared_ptr<Client>& client, Seperator* se
 	Dev		: Zcoretri
 	Example	: 
 */ 
-void Commands::Command_SetLanguage(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_SetLanguage(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -5119,7 +5124,7 @@ void Commands::Command_SetLanguage(const shared_ptr<Client>& client, Seperator* 
 	Dev		: theFoof
 	Example	: 
 */ 
-void Commands::Command_LastName(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LastName(Client* client, Seperator* sep)
 {
 	if (!client)
 		return;
@@ -5150,7 +5155,7 @@ void Commands::Command_LastName(const shared_ptr<Client>& client, Seperator* sep
 	Dev		: theFoof
 	Example	: 
 */ 
-void Commands::Command_ConfirmLastName(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ConfirmLastName(Client* client, Seperator* sep)
 {
 	if (!client)
 		return;
@@ -5172,7 +5177,7 @@ void Commands::Command_ConfirmLastName(const shared_ptr<Client>& client, Seperat
 	Dev		: Scatman
 	Example	: /location = show's help for command
 */ 
-void Commands::Command_Location(const shared_ptr<Client>& client)
+void Commands::Command_Location(Client* client)
 {
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Valid /location commands are:");
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "/location create [name] (include y).  Include y defaults to false");
@@ -5189,7 +5194,7 @@ void Commands::Command_Location(const shared_ptr<Client>& client)
 	Dev		: Scatman
 	Example	: /location add {location_id}
 */ 
-void Commands::Command_LocationAdd(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LocationAdd(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0)) 
 	{
@@ -5214,7 +5219,7 @@ void Commands::Command_LocationAdd(const shared_ptr<Client>& client, Seperator* 
 	Dev		: Scatman 
 	Example	: /location create Test 1 = creates a new location named Test with include_y True
 */ 
-void Commands::Command_LocationCreate(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LocationCreate(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && strlen(sep->arg[0]) > 0) 
 	{
@@ -5242,7 +5247,7 @@ void Commands::Command_LocationCreate(const shared_ptr<Client>& client, Seperato
 	Dev		: Scatman
 	Example	: /location delete {location_id}
 */ 
-void Commands::Command_LocationDelete(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LocationDelete(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0))
 	{
@@ -5264,7 +5269,7 @@ void Commands::Command_LocationDelete(const shared_ptr<Client>& client, Seperato
 	Dev		: Scatman
 	Example	: /location list {location_id}
 */ 
-void Commands::Command_LocationList(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LocationList(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0]) 
 	{
@@ -5291,7 +5296,7 @@ void Commands::Command_LocationList(const shared_ptr<Client>& client, Seperator*
 	Dev		: Scatman
 	Example	: /location remove 1 = will remove location_point_id 1
 */ 
-void Commands::Command_LocationRemove(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_LocationRemove(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0)) 
 	{
@@ -5313,7 +5318,7 @@ void Commands::Command_LocationRemove(const shared_ptr<Client>& client, Seperato
 	Dev		: Scatman
 	Example	: /merchant list
 */ 
-void Commands::Command_Merchant(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_Merchant(Client* client, Seperator* sep, int handler)
 {
 	if( handler == COMMAND_MERCHANT )
 	{
@@ -5351,7 +5356,7 @@ void Commands::Command_Merchant(const shared_ptr<Client>& client, Seperator* sep
 	Dev		: John Adams
 	Example	: /modify spell set name "Aegolism III"
 */ 
-void Commands::Command_Modify(const shared_ptr<Client>& client)
+void Commands::Command_Modify(Client* client)
 {
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /modify [system] [action] [field] [value] {target|id}");
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Systems: character, faction, guild, item, skill, spawn, spell, zone");
@@ -5375,7 +5380,7 @@ void Commands::Command_Modify(const shared_ptr<Client>& client)
 			:	/modify spawn zoneto
 			:	Will set a sign's zone x/y/z to my current coords
 */ 
-void Commands::Command_ModifySpawn(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifySpawn(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5414,7 +5419,7 @@ void Commands::Command_ModifySpawn(const shared_ptr<Client>& client, Seperator* 
 	Example	: /modify character add gold 50
 			: /modify character remove silver 25
 */
-void Commands::Command_ModifyCharacter(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyCharacter(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5568,7 +5573,7 @@ void Commands::Command_ModifyCharacter(const shared_ptr<Client>& client, Seperat
 }
 
 
-void Commands::Command_ModifyFaction(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyFaction(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5581,7 +5586,7 @@ void Commands::Command_ModifyFaction(const shared_ptr<Client>& client, Seperator
 }
 
 
-void Commands::Command_ModifyGuild(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyGuild(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5594,7 +5599,7 @@ void Commands::Command_ModifyGuild(const shared_ptr<Client>& client, Seperator* 
 }
 
 
-void Commands::Command_ModifyItem(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyItem(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5616,7 +5621,7 @@ void Commands::Command_ModifyItem(const shared_ptr<Client>& client, Seperator* s
 			: /modify quest completed
 */
 
-void Commands::Command_ModifyQuest(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyQuest(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5713,7 +5718,7 @@ void Commands::Command_ModifyQuest(const shared_ptr<Client>& client, Seperator* 
 }
 
 
-void Commands::Command_ModifySkill(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifySkill(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5726,7 +5731,7 @@ void Commands::Command_ModifySkill(const shared_ptr<Client>& client, Seperator* 
 
 			if (skill) {
 				Player* player = 0;
-				shared_ptr<Client> to_client = 0;
+				Client* to_client = 0;
 
 				if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer()) {
 					player = (Player*)client->GetPlayer()->GetTarget();
@@ -5763,7 +5768,7 @@ void Commands::Command_ModifySkill(const shared_ptr<Client>& client, Seperator* 
 
 			if (skill) {
 				Player* player = 0;
-				shared_ptr<Client> to_client = 0;
+				Client* to_client = 0;
 
 				if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer()) {
 					player = (Player*)client->GetPlayer()->GetTarget();
@@ -5809,7 +5814,7 @@ void Commands::Command_ModifySkill(const shared_ptr<Client>& client, Seperator* 
 			if (skill) {
 				int16 val = atoi(sep->arg[2]);
 				Player* player = 0;
-				shared_ptr<Client> to_client = 0;
+				Client* to_client = 0;
 
 				if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer()) {
 					player = (Player*)client->GetPlayer()->GetTarget();
@@ -5852,7 +5857,7 @@ void Commands::Command_ModifySkill(const shared_ptr<Client>& client, Seperator* 
 }
 
 
-void Commands::Command_ModifySpell(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifySpell(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5865,7 +5870,7 @@ void Commands::Command_ModifySpell(const shared_ptr<Client>& client, Seperator* 
 }
 
 
-void Commands::Command_ModifyZone(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ModifyZone(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_MODIFY");
 
@@ -5885,7 +5890,7 @@ void Commands::Command_ModifyZone(const shared_ptr<Client>& client, Seperator* s
 	Dev		: LethalEncounter
 	Example	: /motd
 */ 
-void Commands::Command_MOTD(const shared_ptr<Client>& client)
+void Commands::Command_MOTD(Client* client)
 {
 	if (client)
 		ClientPacketFunctions::SendMOTD(client);
@@ -5898,7 +5903,7 @@ void Commands::Command_MOTD(const shared_ptr<Client>& client)
 	Dev		: 
 	Example	: /pet preserve_master
 */ 
-void Commands::Command_Pet(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Pet(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_PET");
 	//LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Pet Commands");
@@ -6010,7 +6015,7 @@ void Commands::Command_Pet(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_PetName(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_PetName(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_PETNAME");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Pet Name Command");
@@ -6024,7 +6029,7 @@ void Commands::Command_PetName(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_NamePet(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_NamePet(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_NAME_PET");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Name Pet Command");
@@ -6038,7 +6043,7 @@ void Commands::Command_NamePet(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_Rename(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Rename(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_RENAME");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Rename Pet Command");
@@ -6052,7 +6057,7 @@ void Commands::Command_Rename(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_ConfirmRename(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ConfirmRename(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_CONFIRMRENAME");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Confirm Rename Pet Command");
@@ -6066,7 +6071,7 @@ void Commands::Command_ConfirmRename(const shared_ptr<Client>& client, Seperator
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_PetOptions(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_PetOptions(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_PETOPTIONS");
 
@@ -6092,7 +6097,7 @@ void Commands::Command_PetOptions(const shared_ptr<Client>& client, Seperator* s
 	Dev		: Scatman
 	Example	: /randon 1 100
 */ 
-void Commands::Command_Random(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Random(Client* client, Seperator* sep)
 {
 	char message[256] = {0};
 
@@ -6118,7 +6123,7 @@ void Commands::Command_Random(const shared_ptr<Client>& client, Seperator* sep)
 	Dev		: Scatman
 	Example	: /randomize gender 1  -- will randomize the NPCs gender (male/female)
 */ 
-void Commands::Command_Randomize(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Randomize(Client* client, Seperator* sep)
 {
 	NPC* target = (NPC*)client->GetPlayer()->GetTarget();
 	if (target) 
@@ -6292,7 +6297,7 @@ void Commands::Command_Randomize(const shared_ptr<Client>& client, Seperator* se
 	Dev		: John Adams
 	Example	: 
 */ 
-void Commands::Command_ShowCloak(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ShowCloak(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6321,7 +6326,7 @@ void Commands::Command_ShowCloak(const shared_ptr<Client>& client, Seperator* se
 	Dev		: John Adams
 	Example	: 
 */ 
-void Commands::Command_ShowHelm(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ShowHelm(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6350,7 +6355,7 @@ void Commands::Command_ShowHelm(const shared_ptr<Client>& client, Seperator* sep
 	Dev		: John Adams
 	Example	: 
 */ 
-void Commands::Command_ShowHood(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ShowHood(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6380,7 +6385,7 @@ void Commands::Command_ShowHood(const shared_ptr<Client>& client, Seperator* sep
 	Dev		: John Adams
 	Example	: 
 */ 
-void Commands::Command_ShowHoodHelm(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ShowHoodHelm(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6413,7 +6418,7 @@ void Commands::Command_ShowHoodHelm(const shared_ptr<Client>& client, Seperator*
 	Dev		: John Adams
 	Example	: 
 */ 
-void Commands::Command_ShowRanged(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ShowRanged(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6442,10 +6447,10 @@ void Commands::Command_ShowRanged(const shared_ptr<Client>& client, Seperator* s
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_Skills(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_Skills(Client* client, Seperator* sep, int handler)
 {
 	Player* player = 0;
-	shared_ptr<Client> to_client = 0;
+	Client* to_client = 0;
 
 	if(client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer())
 		to_client = client->GetPlayer()->GetTarget()->GetZone()->GetClientBySpawn(client->GetPlayer()->GetTarget());
@@ -6589,7 +6594,7 @@ void Commands::Command_Skills(const shared_ptr<Client>& client, Seperator* sep, 
 	Dev		: John Adams
 	Example	: /spawn template create "Test"
 */ 
-void Commands::Command_SpawnTemplate(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_SpawnTemplate(Client* client, Seperator* sep)
 {
 	if (sep == NULL || sep->arg[0] == NULL) 
 	{
@@ -6716,7 +6721,7 @@ void Commands::Command_SpawnTemplate(const shared_ptr<Client>& client, Seperator
 		client->Message(CHANNEL_COLOR_RED, "ERROR: Unknown /spawn template command.");
 }
 
-void Commands::Command_Speed(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Speed(Client* client, Seperator* sep) {
 	if(sep && sep->arg[0][0] && sep->IsNumber(0)){
 		float new_speed = atof(sep->arg[0]);
 		client->GetPlayer()->SetSpeed(new_speed);
@@ -6735,7 +6740,7 @@ void Commands::Command_Speed(const shared_ptr<Client>& client, Seperator* sep) {
 	Params	: 
 	Dev		: John
 */ 
-void Commands::Command_StationMarketPlace(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_StationMarketPlace(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_SMP");
 	// This will reduce the spam from once every 10 sec to once every 30 sec,
@@ -6762,7 +6767,7 @@ void Commands::Command_StationMarketPlace(const shared_ptr<Client>& client, Sepe
 	Dev		: Zcoretri
 	Example	: /stopdrinking
 */ 
-void Commands::Command_StopDrinking(const shared_ptr<Client>& client)
+void Commands::Command_StopDrinking(Client* client)
 {
 	client->GetPlayer()->reset_character_flag(CF_DRINK_AUTO_CONSUME);
 	client->Message(CHANNEL_COLOR_YELLOW,"You stop drinking your current drink.");
@@ -6775,7 +6780,7 @@ void Commands::Command_StopDrinking(const shared_ptr<Client>& client)
 	Dev		: Zcoretri
 	Example	: /stopeating
 */ 
-void Commands::Command_StopEating(const shared_ptr<Client>& client)
+void Commands::Command_StopEating(Client* client)
 {
 	client->GetPlayer()->reset_character_flag(CF_FOOD_AUTO_CONSUME);
 	client->Message(CHANNEL_COLOR_YELLOW,"You stop eating your current food.");
@@ -6788,7 +6793,7 @@ void Commands::Command_StopEating(const shared_ptr<Client>& client)
 	Dev		: Zcoretri
 	Example	: /title
 */ 
-void Commands::Command_Title(const shared_ptr<Client>& client)
+void Commands::Command_Title(Client* client)
 {
 	client->Message(CHANNEL_COLOR_YELLOW, "Available subcommands: list, setprefix <index>, setsuffix <index>, fix");
 }
@@ -6800,7 +6805,7 @@ void Commands::Command_Title(const shared_ptr<Client>& client)
 	Dev		: Zcoretri
 	Example	: /title list
 */ 
-void Commands::Command_TitleList(const shared_ptr<Client>& client)
+void Commands::Command_TitleList(Client* client)
 {
 	list<Title*>* titles = client->GetPlayer()->GetPlayerTitles()->GetAllTitles();
 	list<Title*>::iterator itr;
@@ -6824,7 +6829,7 @@ void Commands::Command_TitleList(const shared_ptr<Client>& client)
 	Dev		: Zcoretri
 	Example	: /title setprefix 1
 */ 
-void Commands::Command_TitleSetPrefix(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TitleSetPrefix(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0))
 	{
@@ -6842,7 +6847,7 @@ void Commands::Command_TitleSetPrefix(const shared_ptr<Client>& client, Seperato
 	Dev		: Zcoretri
 	Example	: /title setsuffix 1
 */ 
-void Commands::Command_TitleSetSuffix(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TitleSetSuffix(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->IsNumber(0))
 	{
@@ -6860,7 +6865,7 @@ void Commands::Command_TitleSetSuffix(const shared_ptr<Client>& client, Seperato
 	Dev		: Zcoretri
 	Example	: 
 */ 
-void Commands::Command_TitleFix(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TitleFix(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_TITLE_FIX");
 	LogWrite(MISC__TODO, 1, "Titles", "TODO-Command: TITLE_FIX");
@@ -6874,7 +6879,7 @@ void Commands::Command_TitleFix(const shared_ptr<Client>& client, Seperator* sep
 	Dev		: paulgh
 	Example	: /anon
 */ 
-void Commands::Command_Toggle_Anonymous(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Anonymous(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -6894,7 +6899,7 @@ void Commands::Command_Toggle_Anonymous(const shared_ptr<Client>& client)
 	Dev		: paulgh
 	Example	: /set_auto_consume
 */ 
-void Commands::Command_Toggle_AutoConsume(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Toggle_AutoConsume(Client* client, Seperator* sep)
 {
 	Player* player = client->GetPlayer();
 
@@ -6934,7 +6939,7 @@ void Commands::Command_Toggle_AutoConsume(const shared_ptr<Client>& client, Sepe
 	Dev		: John Adams
 	Example	: /disable_char_bonus_exp
 */ 
-void Commands::Command_Toggle_BonusXP(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_BonusXP(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -6949,7 +6954,7 @@ void Commands::Command_Toggle_BonusXP(const shared_ptr<Client>& client)
 	Dev		: John Adams
 	Example	: /disable_combat_exp
 */ 
-void Commands::Command_Toggle_CombatXP(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_CombatXP(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -6964,7 +6969,7 @@ void Commands::Command_Toggle_CombatXP(const shared_ptr<Client>& client)
 	Dev		: Scatman
 	Example	: /gm_hide
 */ 
-void Commands::Command_Toggle_GMHide(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_GMHide(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -6979,7 +6984,7 @@ void Commands::Command_Toggle_GMHide(const shared_ptr<Client>& client)
 	Dev		: Scatman
 	Example	: /gm_vanish
 */ 
-void Commands::Command_Toggle_GMVanish(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_GMVanish(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -6994,7 +6999,7 @@ void Commands::Command_Toggle_GMVanish(const shared_ptr<Client>& client)
 	Dev		: paulgh
 	Example	: /hide_illusions
 */ 
-void Commands::Command_Toggle_Illusions(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_Toggle_Illusions(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0])
 		PrintSep(sep, "COMMAND_TOGGLE_ILLUSIONS");
@@ -7008,7 +7013,7 @@ void Commands::Command_Toggle_Illusions(const shared_ptr<Client>& client, Sepera
 	Dev		: paulgh
 	Example	: /lfg
 */ 
-void Commands::Command_Toggle_LFG(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_LFG(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7028,7 +7033,7 @@ void Commands::Command_Toggle_LFG(const shared_ptr<Client>& client)
 	Dev		: paulgh
 	Example	: /lfw
 */ 
-void Commands::Command_Toggle_LFW(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_LFW(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7048,7 +7053,7 @@ void Commands::Command_Toggle_LFW(const shared_ptr<Client>& client)
 	Dev		: John Adams
 	Example	: /disable_quest_exp
 */ 
-void Commands::Command_Toggle_QuestXP(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_QuestXP(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7063,7 +7068,7 @@ void Commands::Command_Toggle_QuestXP(const shared_ptr<Client>& client)
 	Dev		: paulgh
 	Example	: /role
 */ 
-void Commands::Command_Toggle_Roleplaying(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Roleplaying(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7076,7 +7081,7 @@ void Commands::Command_Toggle_Roleplaying(const shared_ptr<Client>& client)
 		player->SetActivityStatus(player->GetActivityStatus() - ACTIVITY_STATUS_ROLEPLAYING);
 }
 
-void Commands::Command_Toggle_Duels(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Duels(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7084,7 +7089,7 @@ void Commands::Command_Toggle_Duels(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting duel invites.", player->get_character_flag(CF_ALLOW_DUEL_INVITES)?"now":"no longer");
 }
 
-void Commands::Command_Toggle_Trades(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Trades(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7092,7 +7097,7 @@ void Commands::Command_Toggle_Trades(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting trade invites.", player->get_character_flag(CF_ALLOW_TRADE_INVITES)?"now":"no longer");
 }
 
-void Commands::Command_Toggle_Guilds(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Guilds(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7100,7 +7105,7 @@ void Commands::Command_Toggle_Guilds(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting guild invites.", player->get_character_flag(CF_ALLOW_GUILD_INVITES)?"now":"no longer");
 }
 
-void Commands::Command_Toggle_Groups(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Groups(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7108,7 +7113,7 @@ void Commands::Command_Toggle_Groups(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting group invites.", player->get_character_flag(CF_ALLOW_GROUP_INVITES)?"now":"no longer");
 }
 
-void Commands::Command_Toggle_Raids(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_Raids(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7116,7 +7121,7 @@ void Commands::Command_Toggle_Raids(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting raid invites.", player->get_character_flag(CF_ALLOW_RAID_INVITES)?"now":"no longer");
 }
 
-void Commands::Command_Toggle_LON(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_LON(Client* client)
 {
 	/*Player* player = client->GetPlayer();
 
@@ -7124,7 +7129,7 @@ void Commands::Command_Toggle_LON(const shared_ptr<Client>& client)
 	client->Message(CHANNEL_COLOR_YELLOW,"You are %s accepting LoN invites.", player->get_character_flag(CF2_ALLOW_LON_INVITES)?"now":"no longer");*/
 }
 
-void Commands::Command_Toggle_VoiceChat(const shared_ptr<Client>& client)
+void Commands::Command_Toggle_VoiceChat(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7140,7 +7145,7 @@ void Commands::Command_Toggle_VoiceChat(const shared_ptr<Client>& client)
 	Example	: 
 */ 
 #include "../Trade.h"
-void Commands::Command_TradeStart(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeStart(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_START_TRADE");
 
@@ -7190,7 +7195,7 @@ void Commands::Command_TradeStart(const shared_ptr<Client>& client, Seperator* s
 	Dev		: Scatman
 	Example	: /track
 */ 
-void Commands::Command_Track(const shared_ptr<Client>& client)
+void Commands::Command_Track(Client* client)
 {
 	if (!client->GetPlayer()->GetIsTracking())
 		client->GetPlayer()->GetZone()->AddPlayerTracking(client->GetPlayer());
@@ -7205,7 +7210,7 @@ void Commands::Command_Track(const shared_ptr<Client>& client)
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeAccept(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeAccept(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_ACCEPT_TRADE");
 	Trade* trade = client->GetPlayer()->trade;
@@ -7225,7 +7230,7 @@ void Commands::Command_TradeAccept(const shared_ptr<Client>& client, Seperator* 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeReject(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeReject(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_REJECT_TRADE");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Reject Player Trading");
@@ -7239,7 +7244,7 @@ void Commands::Command_TradeReject(const shared_ptr<Client>& client, Seperator* 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeCancel(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeCancel(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_CANCEL_TRADE");
 	Trade* trade = client->GetPlayer()->trade;
@@ -7258,7 +7263,7 @@ void Commands::Command_TradeCancel(const shared_ptr<Client>& client, Seperator* 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeSetCoin(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeSetCoin(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_SET_TRADE_COIN");
 	LogWrite(MISC__TODO, 1, "Command", "TODO-Command: Set Trade Coin");
@@ -7272,7 +7277,7 @@ void Commands::Command_TradeSetCoin(const shared_ptr<Client>& client, Seperator*
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeAddCoin(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_TradeAddCoin(Client* client, Seperator* sep, int handler)
 {
 	PrintSep(sep, "COMMAND_ADD_TRADE_{coin type}");
 	Trade* trade = client->GetPlayer()->trade;
@@ -7330,7 +7335,7 @@ void Commands::Command_TradeAddCoin(const shared_ptr<Client>& client, Seperator*
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeRemoveCoin(const shared_ptr<Client>& client, Seperator* sep, int handler)
+void Commands::Command_TradeRemoveCoin(Client* client, Seperator* sep, int handler)
 {
 	PrintSep(sep, "COMMAND_REMOVE_TRADE_{coin type}");
 
@@ -7389,7 +7394,7 @@ void Commands::Command_TradeRemoveCoin(const shared_ptr<Client>& client, Seperat
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeAddItem(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeAddItem(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_ADD_TRADE_ITEM");
 	/*
@@ -7434,7 +7439,7 @@ void Commands::Command_TradeAddItem(const shared_ptr<Client>& client, Seperator*
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_TradeRemoveItem(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TradeRemoveItem(Client* client, Seperator* sep)
 {
 	PrintSep(sep, "COMMAND_REMOVE_TRADE_ITEM");
 	/*
@@ -7453,7 +7458,7 @@ void Commands::Command_TradeRemoveItem(const shared_ptr<Client>& client, Seperat
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "You are not currently trading.");
 }
 
-void Commands::Command_TryOn(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_TryOn(Client* client, Seperator* sep)
 {
 	Item *item = 0;
 	sint32 crc;
@@ -7488,7 +7493,7 @@ void Commands::Command_TryOn(const shared_ptr<Client>& client, Seperator* sep)
 	}
 }
 
-void Commands::Command_JoinChannel(const shared_ptr<Client>& client, Seperator *sep) {
+void Commands::Command_JoinChannel(Client* client, Seperator *sep) {
 	const char *channel_name, *password = NULL;
 
 	if (sep == NULL || !sep->IsSet(0)) {
@@ -7525,12 +7530,12 @@ void Commands::Command_JoinChannel(const shared_ptr<Client>& client, Seperator *
 		client->Message(CHANNEL_COLOR_RED, "There was an internal error preventing you from joining '%s'.", channel_name);
 }
 
-void Commands::Command_JoinChannelFromLoad(const shared_ptr<Client>& client, Seperator *sep) {
+void Commands::Command_JoinChannelFromLoad(Client* client, Seperator *sep) {
 	printf("ScatDebug: Received 'joinfromchannel', using the same function as 'joinchannel' (not sure what the difference is)\n");
 	Command_JoinChannel(client, sep);
 }
 
-void Commands::Command_TellChannel(const shared_ptr<Client>& client, Seperator *sep) {
+void Commands::Command_TellChannel(Client* client, Seperator *sep) {
 	if (sep == NULL || !sep->IsSet(0) || !sep->IsSet(1)) {
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /tellchannel <channel name> <message>");
 		PrintSep(sep, "tellchannel");
@@ -7540,7 +7545,7 @@ void Commands::Command_TellChannel(const shared_ptr<Client>& client, Seperator *
 	chat.TellChannel(client, sep->arg[0], sep->argplus[1]);
 }
 
-void Commands::Command_Mount(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Mount(Client* client, Seperator* sep) {
 	if (sep == nullptr) return;
 
 	if (sep->IsSet(0) && sep->IsNumber(0)) {
@@ -7548,7 +7553,7 @@ void Commands::Command_Mount(const shared_ptr<Client>& client, Seperator* sep) {
 	}
 }
 
-void Commands::Command_Knockback(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Knockback(Client* client, Seperator* sep) {
 	if (sep == nullptr) return;
 
 	float vertical = 0.0;
@@ -7564,7 +7569,7 @@ void Commands::Command_Knockback(const shared_ptr<Client>& client, Seperator* se
 	if (sep->IsSet(2) && sep->IsNumber(2))
 		use_heading = atol(sep->arg[2]);
 
-	shared_ptr<Client> knockback_client = client;
+	Client* knockback_client = client;
 	if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer())
 		knockback_client = client->GetCurrentZone()->GetClientBySpawn(client->GetPlayer()->GetTarget());
 
@@ -7582,7 +7587,7 @@ void Commands::Command_Knockback(const shared_ptr<Client>& client, Seperator* se
 	safe_delete(packet);
 }
 
-void Commands::Command_ResetEncounter(const shared_ptr<Client>& client) {
+void Commands::Command_ResetEncounter(Client* client) {
 	Spawn* target = client->GetPlayer()->GetTarget();
 
 	if (target && target->IsNPC()) {
@@ -7622,7 +7627,7 @@ void Commands::Command_ResetEncounter(const shared_ptr<Client>& client) {
 	}
 }
 
-void Commands::Command_Test(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Test(Client* client, Seperator* sep) {
 	if (sep == nullptr) return;
 
 	/*if (sep->IsSet(2) && sep->IsNumber(2)) {
@@ -7677,7 +7682,7 @@ void Commands::Command_Test(const shared_ptr<Client>& client, Seperator* sep) {
 	}
 }
 
-void Commands::Command_LeaveChannel(const shared_ptr<Client>& client, Seperator *sep) {
+void Commands::Command_LeaveChannel(Client* client, Seperator *sep) {
 	const char *channel_name;
 
 	if (sep == NULL || !sep->IsSet(0)) {
@@ -7701,7 +7706,7 @@ void Commands::Command_LeaveChannel(const shared_ptr<Client>& client, Seperator 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_WeaponStats(const shared_ptr<Client>& client)
+void Commands::Command_WeaponStats(Client* client)
 {
 	Player* player = client->GetPlayer();
 
@@ -7752,7 +7757,7 @@ void Commands::Command_WeaponStats(const shared_ptr<Client>& client)
 
 }
 
-void Commands::Command_WhoChannel(const shared_ptr<Client>& client, Seperator *sep) {
+void Commands::Command_WhoChannel(Client* client, Seperator *sep) {
 	const char *channel_name;
 
 	if (sep == NULL || !sep->IsSet(0)) {
@@ -7768,7 +7773,7 @@ void Commands::Command_WhoChannel(const shared_ptr<Client>& client, Seperator *s
 		chat.SendChannelUserList(client, channel_name);
 }
 
-void Commands::Command_ZoneSafeCoords(const shared_ptr<Client>& client, Seperator *sep) 
+void Commands::Command_ZoneSafeCoords(Client* client, Seperator *sep) 
 {
 	ZoneServer* zone = 0;
 	int32 zone_id = client->GetPlayer()->GetZone()->GetZoneID();
@@ -7797,7 +7802,7 @@ void Commands::Command_ZoneSafeCoords(const shared_ptr<Client>& client, Seperato
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_ZoneDetails(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ZoneDetails(Client* client, Seperator* sep)
 {
 	ZoneInfo* zone_info = new ZoneInfo;
 
@@ -7838,7 +7843,7 @@ void Commands::Command_ZoneDetails(const shared_ptr<Client>& client, Seperator* 
 	Dev		: 
 	Example	: 
 */ 
-void Commands::Command_ZoneSet(const shared_ptr<Client>& client, Seperator* sep)
+void Commands::Command_ZoneSet(Client* client, Seperator* sep)
 {
 	if (sep && sep->arg[0] && sep->arg[1] && sep->arg[2]) 
 	{
@@ -7872,7 +7877,7 @@ void Commands::Command_ZoneSet(const shared_ptr<Client>& client, Seperator* sep)
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /zone set [zone id|zone name] [attribute] [value]");
 }
 
-void Commands::Command_Rain(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Rain(Client* client, Seperator* sep) {
 	if (sep == NULL || !sep->IsSet(0) || !sep->IsNumber(0)) {
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /rain <float>");
 		return;
@@ -7883,7 +7888,7 @@ void Commands::Command_Rain(const shared_ptr<Client>& client, Seperator* sep) {
 	client->GetCurrentZone()->SetCurrentWeather(atof(sep->arg[0]));
 }
 
-void Commands::Command_Wind(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Wind(Client* client, Seperator* sep) {
 	if (sep == NULL || !sep->IsSet(0) || !sep->IsNumber(0)) {
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /wind <float>");
 		return;
@@ -7894,7 +7899,7 @@ void Commands::Command_Wind(const shared_ptr<Client>& client, Seperator* sep) {
 }
 
 
-void Commands::Command_SendMerchantWindow(const shared_ptr<Client>& client, Seperator* sep, bool sell) {
+void Commands::Command_SendMerchantWindow(Client* client, Seperator* sep, bool sell) {
 	Spawn* spawn = client->GetPlayer()->GetTarget();
 	if(spawn) {
 		client->SetMerchantTransaction(spawn);
@@ -7924,7 +7929,7 @@ void Commands::Command_SendMerchantWindow(const shared_ptr<Client>& client, Sepe
 }
 
 
-void Commands::Command_Weather(const shared_ptr<Client>& client, Seperator* sep) 
+void Commands::Command_Weather(Client* client, Seperator* sep) 
 {
 	//PrintSep(sep, "Weather");
 
@@ -7999,7 +8004,7 @@ void Commands::Command_Weather(const shared_ptr<Client>& client, Seperator* sep)
 
 }
 
-void Commands::Command_Select(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Select(Client* client, Seperator* sep) {
 	if (sep && sep->arg[1]) {
 		Spawn* spawn = client->GetPlayer()->GetTarget();
 		if (spawn && strlen(sep->arg[1]) > 0)
@@ -8014,7 +8019,7 @@ void Commands::Command_Select(const shared_ptr<Client>& client, Seperator* sep) 
 	Dev		: Zcoretri
 	Example	: /consume_food 22
 */ 
-void Commands::Command_ConsumeFood(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_ConsumeFood(Client* client, Seperator* sep) {
 	if (sep && sep->arg[0] && sep->IsNumber(0))
 	{
 		Player* player = client->GetPlayer();
@@ -8045,7 +8050,7 @@ void Commands::Command_ConsumeFood(const shared_ptr<Client>& client, Seperator* 
 	}
 }
 
-void Commands::Command_Aquaman(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Aquaman(Client* client, Seperator* sep) {
 	if (sep && sep->arg[0] && sep->IsNumber(0)) {
 		if (atoi(sep->arg[0]) == 1) {
 			client->GetPlayer()->GetInfoStruct()->vision = 4;
@@ -8064,7 +8069,7 @@ void Commands::Command_Aquaman(const shared_ptr<Client>& client, Seperator* sep)
 		client->SimpleMessage(CHANNEL_COLOR_YELLOW, "Usage: /aquaman [0|1]");
 }
 
-void Commands::Command_ReportBug(const shared_ptr<Client>& client, Seperator* sep) 
+void Commands::Command_ReportBug(Client* client, Seperator* sep) 
 {
 	if(sep)
 	{
@@ -8099,7 +8104,7 @@ void Commands::Command_ReportBug(const shared_ptr<Client>& client, Seperator* se
 	}
 }
 
-void Commands::Command_Attune_Inv(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Attune_Inv(Client* client, Seperator* sep) {
 	PrintSep(sep, "Command_Attune_Inv");
 	if (sep && sep->arg[0] && sep->IsNumber(0)) {
 		// Get the item index from the first parameter
@@ -8133,7 +8138,7 @@ void Commands::Command_Attune_Inv(const shared_ptr<Client>& client, Seperator* s
 	}
 }
 
-void Commands::Command_Reset_Zone_Timer(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Reset_Zone_Timer(Client* client, Seperator* sep) {
 	PrintSep(sep, "Command_Reset_Zone_Timer");
 	/*if (sep && sep->arg[0] && sep->IsNumber(0)) {
 		int32 db_id = atoul(sep->arg[0]);
@@ -8152,12 +8157,12 @@ void Commands::Command_Reset_Zone_Timer(const shared_ptr<Client>& client, Sepera
 	}*/
 }
 
-void Commands::Command_Player(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Player(Client* client, Seperator* sep) {
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, " -- /player syntax --");
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "/player coins");
 }
 
-void Commands::Command_Player_Set(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Player_Set(Client* client, Seperator* sep) {
 	Player* player = client->GetPlayer();
 	if (player->HasTarget() && player->GetTarget()->IsPlayer())
 		player = static_cast<Player*>(player->GetTarget());
@@ -8237,7 +8242,7 @@ void Commands::Command_Player_Set(const shared_ptr<Client>& client, Seperator* s
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "/player set [attribute] [value] - sets the given attribute to the provided value");
 }
 
-void Commands::Command_Player_Coins(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Player_Coins(Client* client, Seperator* sep) {
 	// /player coins add 10
 	// /player coins add plat 10
 	Player* player = client->GetPlayer();
@@ -8298,11 +8303,11 @@ void Commands::Command_Player_Coins(const shared_ptr<Client>& client, Seperator*
 	client->SimpleMessage(CHANNEL_COLOR_YELLOW, "/player coins add plat [value] - adds the given amount of platinum to the player");
 }
 
-void Commands::Command_AchievementAdd(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_AchievementAdd(Client* client, Seperator* sep) {
 	PrintSep(sep, "ACHIEVEMENT_ADD");
 }
 
-void Commands::Command_Editor(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Editor(Client* client, Seperator* sep) {
 	PacketStruct* packet = configReader.getStruct("WS_ChoiceWindow", client->GetVersion());
 	if (packet) {
 		string url = string(rule_manager.GetGlobalRule(R_World, EditorURL)->GetString());
@@ -8365,7 +8370,7 @@ void Commands::Command_Editor(const shared_ptr<Client>& client, Seperator* sep) 
 	}
 }
 
-void Commands::Command_AcceptResurrection(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_AcceptResurrection(Client* client, Seperator* sep) {
 	if(!client || !sep || client->GetPlayer()->GetID() != atoul(sep->arg[0]))
 		return;
 	client->GetResurrectMutex()->writelock(__FUNCTION__, __LINE__);
@@ -8374,7 +8379,7 @@ void Commands::Command_AcceptResurrection(const shared_ptr<Client>& client, Sepe
 	client->GetResurrectMutex()->releasewritelock(__FUNCTION__, __LINE__);
 }
 
-void Commands::Command_DeclineResurrection(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_DeclineResurrection(Client* client, Seperator* sep) {
 	if(!client || !sep || client->GetPlayer()->GetID() != atoul(sep->arg[0]))
 		return;
 	client->GetResurrectMutex()->writelock(__FUNCTION__, __LINE__);
@@ -8383,7 +8388,7 @@ void Commands::Command_DeclineResurrection(const shared_ptr<Client>& client, Sep
 	client->GetResurrectMutex()->releasewritelock(__FUNCTION__, __LINE__);
 }
 
-void Commands::Command_ServerFlag(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_ServerFlag(Client* client, Seperator* sep) {
 	if (sep && sep->arg[0] && sep->arg[1] && sep->arg[2]) {
 		client->GetPlayer()->SetPlayerControlFlag(atoi(sep->arg[0]), atoi(sep->arg[1]), atoi(sep->arg[2]));
 	}
@@ -8392,7 +8397,7 @@ void Commands::Command_ServerFlag(const shared_ptr<Client>& client, Seperator* s
 	}
 }
 
-void Commands::Command_PVPRange(const shared_ptr<Client>& client) {
+void Commands::Command_PVPRange(Client* client) {
 	if (PVP::IsEnabled()) {
 		if (PVP::IsEnabled(client->GetCurrentZone())) {
 			client->SimpleMessage(CHANNEL_COLOR_WHITE, "PVP is enabled in this zone.");
@@ -8403,7 +8408,7 @@ void Commands::Command_PVPRange(const shared_ptr<Client>& client) {
 	}
 }
 
-void Commands::Command_PVP(const shared_ptr<Client>& client) {
+void Commands::Command_PVP(Client* client) {
 	if (!PVP::IsEnabled())
 		return;
 
@@ -8412,7 +8417,7 @@ void Commands::Command_PVP(const shared_ptr<Client>& client) {
 	client->Message(CHANNEL_COLOR_WHITE, "Deaths: %i", client->GetPlayer()->GetPlayerStatisticValue(STAT_PLAYER_TOTAL_PVP_DEATHS));
 }
 
-void Commands::Command_KnowledgeWindow_Sort(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_KnowledgeWindow_Sort(Client* client, Seperator* sep) {
 	if (sep && sep->arg[0] && sep->arg[1] && sep->arg[2] && sep->arg[3] && sep->arg[4]) {
 		int8 tab = atoi(sep->arg[0]);
 		int8 sort_by = atoi(sep->arg[1]);
@@ -8425,14 +8430,14 @@ void Commands::Command_KnowledgeWindow_Sort(const shared_ptr<Client>& client, Se
 	}
 }
 
-void Commands::Command_Heal(const shared_ptr<Client>& client) {
+void Commands::Command_Heal(Client* client) {
 	Player* player = client->GetPlayer();
 
 	if (client->GetPlayer()->GetTarget() && client->GetPlayer()->GetTarget()->IsPlayer())
 		player = client->GetCurrentZone()->GetClientBySpawn(client->GetPlayer()->GetTarget())->GetPlayer();
 
 	if (!player->Alive()) {
-		shared_ptr<Client> target_client = client->GetCurrentZone()->GetClientBySpawn(player);
+		Client* target_client = client->GetCurrentZone()->GetClientBySpawn(player);
 
 		if (client) {
 			PacketStruct* packet = configReader.getStruct("WS_Resurrected", target_client->GetVersion());
@@ -8474,7 +8479,7 @@ void Commands::Command_Heal(const shared_ptr<Client>& client) {
 		client->GetPlayer()->ProcHeal(player, "Power", power_amount, power_amount, "Dev Heal");
 }
 
-void Commands::Command_Target(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Target(Client* client, Seperator* sep) {
 	const char* search_name = nullptr;
 
 	if (sep && sep->IsSet(0)) {
@@ -8486,7 +8491,7 @@ void Commands::Command_Target(const shared_ptr<Client>& client, Seperator* sep) 
 	}
 }
 
-void Commands::Command_Assist(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Assist(Client* client, Seperator* sep) {
 	const char* search_name = nullptr;
 
 	if (sep && sep->IsSet(0)) {
@@ -8496,7 +8501,7 @@ void Commands::Command_Assist(const shared_ptr<Client>& client, Seperator* sep) 
 	client->Assist(search_name);
 }
 
-void Commands::Command_Debug(const shared_ptr<Client>& client, Seperator* sep) {
+void Commands::Command_Debug(Client* client, Seperator* sep) {
 	if (sep && sep->arg[0]) {
 		const char* action = sep->arg[0];
 

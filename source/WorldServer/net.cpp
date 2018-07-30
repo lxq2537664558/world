@@ -304,8 +304,8 @@ int main(int argc, char** argv) {
 
 	UpdateWindowTitle(0);
 
-	LogWrite(ZONE__INFO, 0, "Zone", "Starting static zones...");
-	database.LoadSpecialZones();
+	//LogWrite(ZONE__INFO, 0, "Zone", "Starting static zones...");
+	//database.LoadSpecialZones();
 
 	map<EQStream*, int32> connecting_clients;
 
@@ -315,76 +315,76 @@ int main(int argc, char** argv) {
 
 	//LogWrite(WORLD__INFO, 0, "Console", "Type 'help' or '?' and press enter for menu options.");
 
-	while(RunLoops) {
+	ZoneServer* zs = zone_list.Get("freeport");
+
+	while (RunLoops) {
 		Timer::SetCurrentTime();
-		
-			while (EQStream* eqs = eqsf.Pop()) {
-				struct in_addr	in;
-				in.s_addr = eqs->GetRemoteIP();
 
-				LogWrite(NET__DEBUG, 0, "Net", "New client from ip: %s port: %i", inet_ntoa(in), ntohs(eqs->GetRemotePort()));
+		while (EQStream* eqs = eqsf.Pop()) {
+			struct in_addr in;
+			in.s_addr = eqs->GetRemoteIP();
 
-				// JA: Check for BannedIPs
-				if (rule_manager.GetGlobalRule(R_World, UseBannedIPsTable)->GetInt8() == 1) {
- 					if (database.CheckBannedIPs(inet_ntoa(in))) { 
- 						eqs->Close(); // JA: If the inbound IP is on the banned table, close the EQStream.
- 					}
-				}
+			LogWrite(NET__DEBUG, 0, "Net", "New client from ip: %s port: %i", inet_ntoa(in), ntohs(eqs->GetRemotePort()));
 
-				if (eqs && eqs->CheckActive() && !client_list.ContainsStream(eqs)) {
-					LogWrite(NET__DEBUG, 0, "Net", "Adding new client...");
-
-					auto client = make_shared<Client>(eqs);
-					client_list.Add(client);
-				} else if (eqs && !client_list.ContainsStream(eqs)) {
-					LogWrite(NET__DEBUG, 0, "Net", "Adding client to waiting list...");
-
-					connecting_clients[eqs] = Timer::GetCurrentTime2();
+			if (rule_manager.GetGlobalRule(R_World, UseBannedIPsTable)->GetInt8() == 1) {
+				if (database.CheckBannedIPs(inet_ntoa(in))) {
+					eqs->Close();
 				}
 			}
 
-			if (connecting_clients.size() > 0) {
-				for(auto cc_itr = connecting_clients.begin(); cc_itr != connecting_clients.end(); ++cc_itr) {
-					if (cc_itr->first && cc_itr->first->CheckActive() && !client_list.ContainsStream(cc_itr->first)) {
-						LogWrite(NET__DEBUG, 0, "Net", "Removing client from waiting list...");
+			if (eqs && eqs->CheckActive() && !client_list.ContainsStream(eqs)) {
+				auto client = make_unique<Client>(eqs);
+				client->SetCurrentZone(zs);
+				client_list.Add(client.get());
+				zs->AddIncomingClient(move(client));
+			} else if (eqs && !client_list.ContainsStream(eqs)) {
+				connecting_clients[eqs] = Timer::GetCurrentTime2();
+			}
+		}
 
-						auto client = make_unique<Client>(cc_itr->first);
-						client_list.Add(move(client));
+		if (connecting_clients.size() > 0) {
+			for(auto cc_itr = connecting_clients.begin(); cc_itr != connecting_clients.end(); ++cc_itr) {
+				if (cc_itr->first && cc_itr->first->CheckActive() && !client_list.ContainsStream(cc_itr->first)) {
+					LogWrite(NET__DEBUG, 0, "Net", "Removing client from waiting list...");
 
-						connecting_clients.erase(cc_itr);
-						break;
-					} else if (Timer::GetCurrentTime2() >= (cc_itr->second + 10000)) {
-						connecting_clients.erase(cc_itr);
-						break;
-					}
+					auto client = make_unique<Client>(cc_itr->first);
+					client_list.Add(client.get());
+					zs->AddIncomingClient(move(client));
+
+					connecting_clients.erase(cc_itr);
+					break;
+				} else if (Timer::GetCurrentTime2() >= (cc_itr->second + 10000)) {
+					connecting_clients.erase(cc_itr);
+					break;
 				}
 			}
+		}
 
-			world.Process();
-			client_list.Process();
-			loginserver.Process();
-			master_server.Process();
+		world.Process();
+		//client_list.Process();
+		loginserver.Process();
+		master_server.Process();
 
-			if (TimeoutTimer->Check()) {
-				eqsf.CheckTimeout();
+		if (TimeoutTimer->Check()) {
+			eqsf.CheckTimeout();
+		}
+
+		if (InterserverTimer.Check()) {
+			InterserverTimer.Start();
+			database.ping();
+
+			if (true /*getenv("MASTER_SERVER_ENABLED") == "true"*/ && !master_server.Connected() && master_server.Connect()) {
+				LogWrite(WORLD__INFO, 0, "Master", "Connected to Master Server");
+				master_server.SayHello(zs->GetZoneID());
 			}
 
-			if (InterserverTimer.Check()) {
-				InterserverTimer.Start();
-				database.ping();
+			/*if (net.LoginServerInfo && loginserver.Connected() == false && loginserver.CanReconnect()) {
+				LogWrite(WORLD__DEBUG, 0, "Thread", "Starting autoinit loginserver thread...");
 
-				if (getenv("MASTER_SERVER_ENABLED") == "true" && !master_server.Connected() && master_server.Connect()) {
-					LogWrite(WORLD__INFO, 0, "Master", "Connected to Master Server");
-					master_server.SayHello();
-				}
-
-				if (net.LoginServerInfo && loginserver.Connected() == false && loginserver.CanReconnect()) {
-					LogWrite(WORLD__DEBUG, 0, "Thread", "Starting autoinit loginserver thread...");
-
-					thread thr4(AutoInitLoginServer, nullptr);
-					thr4.detach();
-				}
-			}
+				thread thr4(AutoInitLoginServer, nullptr);
+				thr4.detach();
+			}*/
+		}
 
 		this_thread::yield();
 	}
@@ -401,10 +401,11 @@ int main(int argc, char** argv) {
 	safe_delete(lua_interface);
 	safe_delete(TimeoutTimer);
 	eqsf.Close();
-	map<int16, OpcodeManager*>::iterator opcode_itr;
-	for(opcode_itr=EQOpcodeManager.begin();opcode_itr!=EQOpcodeManager.end();opcode_itr++){
+
+	for (auto opcode_itr = EQOpcodeManager.begin(); opcode_itr != EQOpcodeManager.end(); ++opcode_itr) {
 		safe_delete(opcode_itr->second);
 	}
+
 	CheckEQEMuErrorAndPause();
 
 #ifdef PROFILER
