@@ -109,6 +109,8 @@
 #define ServerOP_MSHello			0x4000
 #define ServerOP_MSAuthPlayer		0x4001
 #define ServerOP_MSKickPlayer		0x4002
+#define ServerOP_MSPlayerOnline     0x4003
+#define ServerOP_MSPlayerOffline    0x4004
 
 #define	ServerOP_UsertoWorldReq		0xAB00
 #define	ServerOP_UsertoWorldResp	0xAB01
@@ -253,6 +255,10 @@ struct ServerMSInfo_Struct {
 struct ServerMSAuthPlayer_Struct {
 	int32	account_id;
 	int32	char_id;
+};
+
+struct ServerMSPlayer_Struct {
+	int32 character_id;
 };
 
 struct ServerMSKickPlayer_Struct {

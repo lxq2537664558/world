@@ -80,6 +80,7 @@ extern int errno;
 #include <algorithm>
 #include <thread>
 #include "PVP.h"
+#include "MasterServer.h"
 
 #include "Zone/SPGrid.h"
 #include "Bots/Bot.h"
@@ -107,6 +108,7 @@ extern Chat chat;
 extern MasterRaceTypeList race_types_list;
 extern MasterSpellList master_spell_list;
 extern MasterSkillList master_skill_list;
+extern MasterServer master_server;
 
 int32 MinInstanceID = 1000;
 
@@ -2927,6 +2929,8 @@ void ZoneServer::RemoveClient(unique_ptr<Client> client) {
 		zone_list.RemoveClientFromMap(client->GetPlayer()->GetName());
 
 		database.ToggleCharacterOnline(client.get(), 0);
+
+		master_server.PlayerOffline(client->GetCharacterID());
 
 		LogWrite(ZONE__INFO, 0, "Zone", "Scheduling client '%s' for removal.", client->GetPlayer()->GetName());
 

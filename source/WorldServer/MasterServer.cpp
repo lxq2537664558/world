@@ -73,3 +73,19 @@ void MasterServer::SayHello(int32 zone_id) {
 	tcpc->SendPacket(pack);
 	safe_delete(pack);
 }
+
+void MasterServer::PlayerOnline(int32 character_id) {
+	auto pack = new ServerPacket(ServerOP_MSPlayerOnline, sizeof(ServerMSPlayer_Struct));
+	auto msp = (ServerMSPlayer_Struct*)pack->pBuffer;
+	msp->character_id = character_id;
+	tcpc->SendPacket(pack);
+	safe_delete(pack);
+}
+
+void MasterServer::PlayerOffline(int32 character_id) {
+	auto pack = new ServerPacket(ServerOP_MSPlayerOffline, sizeof(ServerMSPlayer_Struct));
+	auto msp = (ServerMSPlayer_Struct*)pack->pBuffer;
+	msp->character_id = character_id;
+	tcpc->SendPacket(pack);
+	safe_delete(pack);
+}

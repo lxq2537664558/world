@@ -87,6 +87,8 @@ along with EQ2Emulator.  If not, see <http://www.gnu.org/licenses/>.
 #include "Bots/Bot.h"
 #include "zoneserver.h"
 #include "SpellProcess.h"
+#include "MasterServer.h"
+
 extern WorldDatabase database;
 extern const char* ZONE_NAME;
 extern LoginServer loginserver;
@@ -118,6 +120,7 @@ extern IRC irc;
 extern Chat chat;
 extern MasterAAList master_aa_list;
 extern MasterAAList master_tree_nodes;
+extern MasterServer master_server;
 
 using namespace std;
 
@@ -271,6 +274,8 @@ void Client::SendLoginInfo() {
 
 	LogWrite(CCLIENT__DEBUG, 0, "Client", "Toggle Character Online...");
 	database.ToggleCharacterOnline(this, 1);
+
+	master_server.PlayerOnline(GetCharacterID());
 
 	LogWrite(CCLIENT__DEBUG, 0, "Client", "Loading Character Skills for player '%s'...", player->GetName());
 	int32 count = database.LoadCharacterSkills(GetCharacterID(), player);
